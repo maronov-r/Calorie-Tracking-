@@ -9,7 +9,7 @@ const GROUPS = [['Macros & more', MACROS], ['Vitamins', VITAMINS], ['Minerals', 
 export function NutrientsView({ dateKey, openSheet, go }) {
   const s = useStore();
   const [range, setRange] = useState('day');
-  const t = getTargets();
+  const t = getTargets(dateKey);
   const week = weekAverage(dateKey);
   const totals = range === 'day' ? totalsFor(dateKey) : week.totals;
   const met = MICROS.filter((n) => (totals[n.key] || 0) >= t[n.key]).length;
@@ -41,7 +41,9 @@ export function NutrientsView({ dateKey, openSheet, go }) {
     ${GROUPS.map(([label, list]) => html`
       <section class="card nlist">
         <h2 class="card-title">${label}</h2>
-        ${list.map((n) => html`<${NutrientRow} n=${n} value=${totals[n.key] || 0} target=${t[n.key]} onClick=${() => openSheet({ type: 'nutrient', key: n.key })} />`)}
+        ${list.map((n) => (n.key === 'carbs' && t.netCarbs
+          ? html`<${NutrientRow} n=${{ ...n, name: 'Net carbs (carbs − fiber)', limit: true }} value=${Math.max(0, (totals.carbs || 0) - (totals.fiber || 0))} target=${t.carbs} onClick=${() => openSheet({ type: 'nutrient', key: n.key })} />`
+          : html`<${NutrientRow} n=${n} value=${totals[n.key] || 0} target=${t[n.key]} onClick=${() => openSheet({ type: 'nutrient', key: n.key })} />`))}
       </section>`)}
 
     <p class="fine center">Targets are the U.S. Recommended Dietary Allowances for your age and sex.${s.supplements.length ? ' Supplements you tick off count too.' : ''}</p>
@@ -51,7 +53,7 @@ export function NutrientsView({ dateKey, openSheet, go }) {
 const OWN_COLOR = ['protein', 'carbs', 'fat'];
 
 function NutrientRow({ n, value, target, onClick }) {
-  const st = status(n.key, value, target);
+  const st = n.limit && target ? (value > target ? 'over' : 'good') : status(n.key, value, target);
   const pct = target ? value / target : 0;
   // Macros fill up over the day, so they use their own color instead of "low" red.
   const color = OWN_COLOR.includes(n.key) && st !== 'over' ? `var(--${n.key})` : statusColor(st);
@@ -109,7 +111,7 @@ function NutrientDetail({ nkey, dateKey, close, onSearch }) {
   const s = useStore();
   const n = N[nkey];
   const info = INFO[nkey] || {};
-  const t = getTargets();
+  const t = getTargets(dateKey);
   const target = t[nkey];
   const day = totalsFor(dateKey)[nkey] || 0;
   const week = weekAverage(dateKey);
@@ -128,6 +130,7 @@ function NutrientDetail({ nkey, dateKey, close, onSearch }) {
         <${Stat} nkey=${nkey} target=${target} label=${dayTitle(dateKey)} value=${day} />
         <${Stat} nkey=${nkey} target=${target} label="7-day average" value=${avg} />
       </div>
+      ${nkey === 'carbs' && t.netCarbs && html`<p class="fine">These are total carbs. On keto your ${t.carbs} g limit counts net carbs (carbs minus fiber), which Today and the Nutrients list show.</p>`}
       ${UPPER[nkey] && html`<p class="fine">Upper limit: ${fmtNum(UPPER[nkey])} ${n.unit} a day. That mostly matters if you take supplements.</p>`}
 
       ${from.length > 0 && html`

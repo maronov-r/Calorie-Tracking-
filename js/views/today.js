@@ -1,13 +1,15 @@
 import { html, useState, useEffect } from '../vendor/preact.js';
 import {
-  useStore, getDay, getTargets, totalsFor, weekAverage, MEALS, setWater, toggleSupp, setSettings,
+  useStore, getDay, getTargets, totalsFor, weekAverage, MEALS, toggleSupp, setSettings,
   dateKey as todayKey, shiftKey, parseKey, updateEntry, removeEntry, addEntries, toast, latestWeighIn,
 } from '../store.js';
 import { Ring, Bar, Icon, Stepper, Segmented, Sheet, NutritionSummary, statusColor } from '../ui.js';
 import {
-  fmtKcal, fmtWater, fmtWeight, ML_PER_OZ, MICROS, VITAMINS, MINERALS, status, fmtQty, scale, isGaining,
+  fmtKcal, fmtWeight, MICROS, VITAMINS, MINERALS, status, fmtQty, scale, isGaining,
 } from '../nutrients.js';
 import { describeAmount } from '../foods.js';
+import { proteinIdeas } from '../coach.js';
+import { WaterCard } from './water.js';
 
 const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
@@ -30,7 +32,7 @@ const standalone = navigator.standalone || matchMedia('(display-mode: standalone
 
 export function Today({ dateKey, setDateKey, openSheet, go }) {
   const s = useStore();
-  const t = getTargets();
+  const t = getTargets(dateKey);
   const day = getDay(dateKey);
   const totals = totalsFor(dateKey);
   const week = weekAverage(dateKey);
@@ -63,8 +65,8 @@ export function Today({ dateKey, setDateKey, openSheet, go }) {
         <button type="button" class="icon-btn sm" onClick=${() => setSettings({ hideInstallHint: true })} aria-label="Dismiss"><${Icon} name="close" size=${16} /></button>
       </div>`}
 
-    <${CalorieCard} totals=${totals} t=${t} gaining=${isGaining(s.profile.goal)} openNutrient=${(key) => openSheet({ type: 'nutrient', key })} />
-    <${WaterCard} dateKey=${dateKey} ml=${day.water || 0} goal=${t.water} units=${s.settings.units} />
+    <${CalorieCard} totals=${totals} t=${t} gaining=${isGaining(s.profile.goal)} isToday=${dateKey === today} openSheet=${openSheet} />
+    <${WaterCard} dateKey=${dateKey} ml=${day.water || 0} goal=${t.water} units=${s.settings.units} openSheet=${openSheet} />
     <${MicroCard} totals=${totals} t=${t} week=${week} hasFood=${day.entries.length > 0}
       openNutrient=${(key) => openSheet({ type: 'nutrient', key })} go=${go} />
     ${s.supplements.length > 0 && html`<${SuppCard} supps=${s.supplements} taken=${day.supps || []} dateKey=${dateKey} />`}
@@ -99,16 +101,23 @@ function WeekStrip({ dateKey, setDateKey, today, goal }) {
     </div>`;
 }
 
-const MACRO_ROWS = [['carbs', 'Carbs'], ['fat', 'Fat']];
-
 // Calories and protein side by side: the two numbers that matter most for building muscle.
-function CalorieCard({ totals, t, gaining, openNutrient }) {
+function CalorieCard({ totals, t, gaining, isToday, openSheet }) {
+  const openNutrient = (key) => openSheet({ type: 'nutrient', key });
   const eaten = totals.kcal || 0;
   const left = t.kcal - eaten;
   const over = left < 0;
   const protein = totals.protein || 0;
   const proteinLeft = t.protein - protein;
   const proteinHit = proteinLeft <= 0;
+  const ideas = isToday && !proteinHit && (totals.kcal || 0) > 0 ? proteinIdeas(proteinLeft, t.style) : [];
+  // On keto the carb target is a ceiling on net carbs (carbs minus fiber).
+  const rows = [
+    t.netCarbs
+      ? { k: 'carbs', label: 'Net carbs', value: Math.max(0, (totals.carbs || 0) - (totals.fiber || 0)), max: true }
+      : { k: 'carbs', label: 'Carbs', value: totals.carbs || 0 },
+    { k: 'fat', label: 'Fat', value: totals.fat || 0 },
+  ];
   return html`
     <section class="card hero">
       <div class="duo">
@@ -129,55 +138,21 @@ function CalorieCard({ totals, t, gaining, openNutrient }) {
         </button>
       </div>
       <div class="macros two">
-        ${MACRO_ROWS.map(([k, label]) => html`
-          <div class="macro">
-            <span class="macro-label"><i class="dot" style=${{ background: `var(--${k})` }} />${label}</span>
-            <${Bar} value=${totals[k] || 0} max=${t[k]} color=${`var(--${k})`} />
-            <span class="macro-val"><b>${Math.round(totals[k] || 0)}</b> / ${t[k]} g</span>
-          </div>`)}
+        ${rows.map(({ k, label, value, max }) => {
+          const color = max && value > t[k] ? 'var(--over)' : `var(--${k})`;
+          return html`
+            <div class="macro">
+              <span class="macro-label"><i class="dot" style=${{ background: color }} />${label}</span>
+              <${Bar} value=${value} max=${t[k]} color=${color} />
+              <span class="macro-val"><b>${Math.round(value)}</b> / ${max ? 'max ' : ''}${t[k]} g</span>
+            </div>`;
+        })}
       </div>
-    </section>`;
-}
-
-const DROP = 'M12 3.5s6 6.4 6 10.9a6 6 0 0 1-12 0c0-4.5 6-10.9 6-10.9z';
-const Drop = ({ fill, id }) => html`
-  <svg viewBox="0 0 24 24" width="30" height="30" aria-hidden="true">
-    <defs><clipPath id=${id}><rect x="0" y=${3.5 + 16.9 * (1 - fill)} width="24" height="24" /></clipPath></defs>
-    <path d=${DROP} class="drop-bg" />
-    ${fill > 0 && html`<path d=${DROP} class="drop-fill" clip-path=${`url(#${id})`} />`}
-  </svg>`;
-
-function WaterCard({ dateKey, ml, goal, units }) {
-  const glass = units === 'metric' ? 250 : 8 * ML_PER_OZ;
-  let per = glass;
-  let count = Math.ceil(goal / per - 0.01);
-  if (count > 12) { per = glass * 2; count = Math.ceil(goal / per - 0.01); }
-  const filled = ml / per;
-  const perLabel = units === 'metric' ? `${per} ml` : `${Math.round(per / ML_PER_OZ)} oz`;
-  const tap = (i) => {
-    const target = (i + 1) * per;
-    setWater(dateKey, Math.abs(ml - target) < 2 ? i * per : target);
-  };
-  const done = ml >= goal - 1;
-  return html`
-    <section class="card water">
-      <div class="card-head">
-        <h2 class="card-title"><span class="title-icon" style=${{ color: 'var(--water)' }}><${Icon} name="drop" size=${18} /></span>Water</h2>
-        <span class="card-meta"><b>${fmtWater(ml, units)}</b> / ${fmtWater(goal, units)}${done ? ' ✓' : ''}</span>
-      </div>
-      <div class="drops" style=${{ gridTemplateColumns: `repeat(${Math.min(count, 12)}, 1fr)` }}>
-        ${Array.from({ length: count }, (_, i) => html`
-          <button type="button" class="drop" onClick=${() => tap(i)} aria-label=${`Set water to ${fmtWater((i + 1) * per, units)}`}>
-            <${Drop} fill=${Math.max(0, Math.min(1, filled - i))} id=${`drop-${i}`} />
-          </button>`)}
-      </div>
-      <div class="water-foot">
-        <span class="fine">Tap a drop · each is ${perLabel}</span>
-        <div class="water-btns">
-          <button type="button" class="chip icon-chip" onClick=${() => setWater(dateKey, ml - per)} disabled=${ml <= 0} aria-label=${`Remove ${perLabel}`}><${Icon} name="minus" size=${16} /></button>
-          <button type="button" class="chip" onClick=${() => setWater(dateKey, ml + per)}><${Icon} name="plus" size=${16} /> ${perLabel}</button>
-        </div>
-      </div>
+      ${ideas.length > 0 && html`
+        <div class="ideas">
+          <span class="ideas-label">${Math.ceil(proteinLeft)} g protein to go. Easy wins:</span>
+          ${ideas.map((f) => html`<button type="button" class="chip" onClick=${() => openSheet({ type: 'add', mode: 'search', query: f.q })}>${f.label} <b>${f.g} g</b></button>`)}
+        </div>`}
     </section>`;
 }
 

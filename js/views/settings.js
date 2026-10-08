@@ -1,10 +1,10 @@
 import { html, useState, useRef, useEffect } from '../vendor/preact.js';
 import {
-  useStore, state, setProfile, setSettings, setWeight, getTargets, THEMES, saveSupplement, deleteSupplement,
+  useStore, state, setProfile, setSettings, setWeight, getTargets, updatePlan, THEMES, saveSupplement, deleteSupplement,
   exportData, importData, eraseAll, toast, dateKey as todayKey,
 } from '../store.js';
 import { Icon, Segmented, NumberInput, Sheet } from '../ui.js';
-import { ACTIVITY, GOALS, ML_PER_OZ, MICROS, N, SUPP_PRESETS, fmtNum, computeTargets, KG_PER_LB } from '../nutrients.js';
+import { ACTIVITY, ML_PER_OZ, MICROS, N, SUPP_PRESETS, fmtNum, fmtKcal, computeTargets, goalFor, styleFor, KG_PER_LB } from '../nutrients.js';
 import { AI_MODELS } from '../ai.js';
 
 
@@ -59,7 +59,7 @@ export const ChoiceList = ({ options, value, onChange }) => html`
       </button>`)}
   </div>`;
 
-export function SettingsView({ go, section }) {
+export function SettingsView({ go, section, openSheet }) {
   useEffect(() => {
     if (section) document.getElementById(section)?.scrollIntoView({ block: 'start' });
   }, [section]);
@@ -78,10 +78,11 @@ export function SettingsView({ go, section }) {
     if (weightKg) setWeight(todayKey(), weightKg);
     if (Object.keys(patch).length) setProfile({ ...state.profile, ...patch });
   };
+  const handSet = ['kcal', 'protein', 'carbs', 'fat'].filter((k) => ov[k]);
   const setOv = (k, v) => setSettings({ overrides: { ...ov, [k]: v > 0 ? v : undefined } });
   // What each target would be without its own override (carbs and fat follow the calorie/protein targets).
-  const auto = computeTargets(p, {});
-  const autoSplit = computeTargets(p, { kcal: ov.kcal, protein: ov.protein });
+  const auto = computeTargets(p, {}, t.style);
+  const autoSplit = computeTargets(p, { kcal: ov.kcal, protein: ov.protein }, t.style);
   const waterVal = ov.water ? (units === 'metric' ? ov.water : Math.round(ov.water / ML_PER_OZ)) : '';
   const autoWater = units === 'metric' ? auto.water : Math.round(auto.water / ML_PER_OZ);
 
@@ -139,21 +140,29 @@ export function SettingsView({ go, section }) {
       <${ProfileFields} key=${units} profile=${p} onChange=${upd} units=${units} />
       <div class="field">
         <span class="field-label">Activity</span>
-        <select class="select" value=${p.activity} onChange=${(e) => upd({ activity: e.currentTarget.value })}>
+        <select class="select" value=${p.activity} onChange=${(e) => updatePlan({ activity: e.currentTarget.value })}>
           ${ACTIVITY.map((a) => html`<option value=${a.value}>${a.label}: ${a.hint}</option>`)}
         </select>
       </div>
       <div class="field">
-        <span class="field-label">Goal</span>
-        <select class="select" value=${p.goal} onChange=${(e) => upd({ goal: e.currentTarget.value })}>
-          ${GOALS.map((g) => html`<option value=${g.value}>${g.label} · ${g.hint}</option>`)}
-        </select>
+        <span class="field-label">Goal and eating style</span>
+        <button type="button" class="select-row" onClick=${() => openSheet({ type: 'plan' })}>
+          <span><b>${goalFor(p.goal).label}</b> · ${styleFor(t.style).label}<small>${fmtKcal(t.kcal)} kcal · ${t.protein} g protein</small></span>
+          <${Icon} name="right" size=${18} />
+        </button>
       </div>
     </section>
 
     <section class="card set-section">
       <h2 class="card-title">Daily targets</h2>
-      <p class="fine">Worked out from your details (you burn about ${fmtNum(t.auto.tdee)} kcal a day). Type a number to override one, or clear it to go back to automatic.</p>
+      <p class="fine">Worked out from your details (you burn about ${fmtNum(t.auto.tdee)} kcal a day). Type a number to override one, or clear it to go back to automatic.
+        <button type="button" class="link" onClick=${() => openSheet({ type: 'plan', tab: 'math' })}>See how</button></p>
+      ${handSet.length > 0 && html`
+        <div class="tip warn-tip">
+          <${Icon} name="info" size=${17} />
+          <span>Numbers you type here stay fixed: changing your goal, eating style or weight won't move them.
+            <button type="button" class="link" onClick=${() => setSettings({ overrides: { water: ov.water } })}>Use automatic</button></span>
+        </div>`}
       <div class="field-grid">
         <${NumberInput} className="field" label="Calories" value=${ov.kcal || ''} placeholder=${`${auto.kcal} auto`} suffix="kcal" onChange=${(v) => setOv('kcal', v)} />
         <${NumberInput} className="field" label="Protein" value=${ov.protein || ''} placeholder=${`${auto.protein} auto`} suffix="g" onChange=${(v) => setOv('protein', v)} />

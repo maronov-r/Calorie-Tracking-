@@ -69,7 +69,7 @@ export function Onboarding() {
       <div class="ob">
         ${dots()}
         <h1 class="ob-h">What's your goal?</h1>
-        <p class="ob-sub">You can change this any time in Settings.</p>
+        <p class="ob-sub">You can change this any time on the Profile page, along with your eating style (balanced, low carb or keto).</p>
         <${ChoiceList} options=${GOALS.map((g) => ({ value: g.value, label: g.label, hint: g.hint }))} value=${p.goal} onChange=${(v) => upd({ goal: v })} />
         ${nav(() => setStep(4))}
       </div>`;

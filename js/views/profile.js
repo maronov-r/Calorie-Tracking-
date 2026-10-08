@@ -1,12 +1,13 @@
 import { html, useState } from '../vendor/preact.js';
 import {
-  useStore, getTargets, getDay, totalsFor, weekAverage, weighIns, latestWeighIn, setWeight, toast,
+  useStore, state, getTargets, getDay, totalsFor, weekAverage, weighIns, latestWeighIn, setWeight, toast, updatePlan, setProfile,
   dateKey as todayKey, shiftKey, parseKey,
 } from '../store.js';
 import { Icon, Bar, Segmented, Sheet, NumberInput, Empty, statusColor } from '../ui.js';
 import {
-  goalFor, ACTIVITY, MICROS, fmtKcal, fmtWeight, fmtWater, kgToDisplay, displayToKg, weightUnit, KG_PER_LB,
+  goalFor, styleFor, MICROS, fmtKcal, fmtWeight, kgToDisplay, displayToKg, weightUnit, KG_PER_LB,
 } from '../nutrients.js';
+import { coachLine, calorieCheck } from '../coach.js';
 import { withTrend, weeklyRate, paceAdvice, fmtRate } from '../weight.js';
 import { WeightChart, IntakeChart } from '../charts.js';
 
@@ -77,6 +78,8 @@ export function ProfileView({ openSheet, go }) {
         <p class="subtitle">${g.label} · ${p.age} · ${heightLabel(p.heightCm, units)}</p>
       </div>
     </header>
+
+    <${PlanCard} t=${t} openSheet=${openSheet} />
 
     <section class="card">
       <div class="card-head">
@@ -151,21 +154,49 @@ export function ProfileView({ openSheet, go }) {
       : html`<p class="fine">Log some food to see how your vitamins and minerals are doing.</p>`}
     </section>
 
-    <section class="card">
+  `;
+}
+
+// ---- Plan and coach ----
+
+function PlanCard({ t, openSheet }) {
+  const p = state.profile;
+  const today = todayKey();
+  const check = calorieCheck(today);
+  const apply = () => {
+    updatePlan({ adjust: (p.adjust || 0) + check.delta, adjustOn: today });
+  };
+  const snooze = () => setProfile({ ...state.profile, checkSnooze: shiftKey(today, 7) }); // ask again in a week
+  return html`
+    <section class="card plan-card">
       <div class="card-head">
         <h2 class="card-title">Your plan</h2>
-        <button type="button" class="link" onClick=${() => go('settings')}>Edit</button>
+        <button type="button" class="link" onClick=${() => openSheet({ type: 'plan' })}>Change</button>
       </div>
-      <div class="plan-list">
-        <div><span>Goal</span><b>${g.label}</b></div>
-        <div><span>Calories</span><b>${fmtKcal(t.kcal)} kcal</b></div>
-        <div><span>Protein</span><b>${t.protein} g</b></div>
-        <div><span>Carbs · Fat</span><b>${t.carbs} g · ${t.fat} g</b></div>
-        <div><span>Water</span><b>${fmtWater(t.water, units)}</b></div>
-        <div><span>Activity</span><b>${(ACTIVITY.find((a) => a.value === p.activity) || ACTIVITY[1]).label}</b></div>
+      <button type="button" class="plan-pills" onClick=${() => openSheet({ type: 'plan' })}>
+        <span class="pill">${goalFor(p.goal).label}</span>
+        <span class="pill">${styleFor(t.style).label}</span>
+      </button>
+      <div class="plan-sum">
+        <div><b>${fmtKcal(t.kcal)}</b><span>kcal</span></div>
+        <div><b style=${{ color: 'var(--protein)' }}>${t.protein} g</b><span>protein</span></div>
+        <div><b>${t.carbs} g</b><span>${t.netCarbs ? 'net carbs' : 'carbs'}</span></div>
+        <div><b>${t.fat} g</b><span>fat</span></div>
       </div>
-    </section>
-  `;
+      ${check ? html`
+        <div class="coach-note check">
+          <p><b>Calorie check-in.</b> ${check.text}</p>
+          <div class="coach-btns">
+            <button type="button" class="btn btn-quiet" onClick=${snooze}>Not now</button>
+            <button type="button" class="btn btn-primary" onClick=${apply}>${check.delta > 0 ? 'Add' : 'Cut'} 150 kcal</button>
+          </div>
+        </div>` : html`
+        <div class="coach-note"><p>${coachLine(today)}</p></div>`}
+      <div class="coach-btns">
+        <button type="button" class="btn btn-quiet" onClick=${() => openSheet({ type: 'plan', tab: 'math' })}>How it works</button>
+        <button type="button" class="btn btn-quiet" onClick=${() => openSheet({ type: 'coach' })}><${Icon} name="chat" size=${18} /> Ask the coach</button>
+      </div>
+    </section>`;
 }
 
 // ---- Quick weigh-in ----

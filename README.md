@@ -12,8 +12,11 @@ A calm, private calorie tracker for your phone. It tracks calories, macros, wate
 
 ## What it does
 
-- **Today:** calorie and protein rings side by side, carb and fat bars, tap-a-drop water tracking, a grid of vitamin and mineral rings, and a small weigh-in button.
-- **Profile:** your weight trend (smoothed over 7 days) with a weekly rate and coaching for your goal, 14 days of protein or calories against your goal, how many days you hit protein, and how your vitamins are doing.
+- **Today:** calorie and protein rings side by side, quick protein ideas when you're short, carb and fat bars, water with one-tap buttons for your own bottles (Stanley, Hydro Flask, any size), a grid of vitamin and mineral rings, and a small weigh-in button.
+- **Profile:** your plan with a plain-language coach, your weight trend (smoothed over 7 days) with a weekly rate, 14 days of protein or calories against your goal, how many days you hit protein, and how your vitamins are doing.
+- **Coach (free, built in):** explains what your goal means and exactly how each number is worked out, and after two weeks of weigh-ins it suggests small calorie changes when you drift off pace.
+- **Eating styles:** Balanced, Higher carb, Low carb or Keto. A style changes only how your calories split between carbs and fat, never your calories or protein, and applies from the day you pick it. Keto tracks net carbs.
+- **Ask the coach (optional):** chat with Claude about your eating. It sees your goal, targets, food log and weight trend, and can offer to change your plan with one tap. Uses your API key, about 1 to 3¢ a question.
 - **Three ways to log food:**
   - **Search** about 7,800 everyday foods from the USDA with full vitamin and mineral data. It works offline.
   - **Scan** a barcode on packaged food (via Open Food Facts).
@@ -51,8 +54,9 @@ js/store.js                               state + IndexedDB persistence
 js/nutrients.js                           nutrient list, RDAs, targets, formatting
 js/foods.js                               local food search
 js/weight.js, js/charts.js                weight trend math and SVG charts
+js/coach.js                               built-in coaching: plan explanation, calorie check-ins, protein ideas
 js/off.js                                 Open Food Facts barcode lookup
-js/ai.js                                  Claude meal estimates
+js/ai.js                                  Claude meal estimates and coach chat
 js/views/*                                screens
 js/vendor/*                               Preact + htm, Anthropic SDK, barcode scanner (bundled)
 data/foods.json                           USDA SR Legacy, trimmed to 26 nutrients

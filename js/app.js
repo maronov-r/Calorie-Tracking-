@@ -7,6 +7,8 @@ import { AddSheet } from './views/add.js';
 import { NutrientsView, NutrientSheet } from './views/nutrients.js';
 import { ProfileView, WeighInSheet } from './views/profile.js';
 import { SettingsView } from './views/settings.js';
+import { PlanSheet, CoachSheet } from './views/coach.js';
+import { WaterSheet } from './views/water.js';
 import { Onboarding } from './views/onboarding.js';
 
 const TABS = [
@@ -56,7 +58,7 @@ function App() {
       ${tab === 'today' && html`<${Today} dateKey=${day} setDateKey=${setDay} openSheet=${setSheet} go=${go} />`}
       ${tab === 'nutrients' && html`<${NutrientsView} dateKey=${day} openSheet=${setSheet} go=${go} />`}
       ${tab === 'profile' && html`<${ProfileView} openSheet=${setSheet} go=${go} />`}
-      ${tab === 'settings' && html`<${SettingsView} go=${go} section=${section} />`}
+      ${tab === 'settings' && html`<${SettingsView} go=${go} section=${section} openSheet=${setSheet} />`}
     </main>
 
     <nav class="tabbar" aria-label="Main">
@@ -74,6 +76,9 @@ function App() {
         onClose=${closeSheet(sheet)} toSettings=${() => { setSheet(null); go('settings', 'ai'); }} />`}
     ${sheet?.type === 'entry' && html`<${EntrySheet} dateKey=${day} id=${sheet.id} onClose=${closeSheet(sheet)} />`}
     ${sheet?.type === 'weigh' && html`<${WeighInSheet} onClose=${closeSheet(sheet)} />`}
+    ${sheet?.type === 'water' && html`<${WaterSheet} dateKey=${day} onClose=${closeSheet(sheet)} />`}
+    ${sheet?.type === 'plan' && html`<${PlanSheet} tab=${sheet.tab} onClose=${closeSheet(sheet)} openCoach=${() => setSheet({ type: 'coach' })} />`}
+    ${sheet?.type === 'coach' && html`<${CoachSheet} onClose=${closeSheet(sheet)} toSettings=${() => go('settings', 'ai')} />`}
     ${sheet?.type === 'nutrient' && html`
       <${NutrientSheet} nkey=${sheet.key} dateKey=${day} onClose=${closeSheet(sheet)}
         onSearch=${(q) => setSheet({ type: 'add', mode: 'search', query: q })} />`}

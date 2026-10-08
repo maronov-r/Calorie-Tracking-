@@ -1,5 +1,6 @@
-// Offline support: serve the app from cache, refresh it in the background.
-const CACHE = 'plate-v2';
+// Offline support. App code comes from the network when it can (so updates show up right away)
+// and from the cache when offline. Big, rarely changing files are served from the cache first.
+const CACHE = 'plate-v3';
 const SHELL = [
   './',
   './index.html',
@@ -14,12 +15,15 @@ const SHELL = [
   './js/ui.js',
   './js/weight.js',
   './js/charts.js',
+  './js/coach.js',
   './js/lib/db.js',
   './js/views/today.js',
   './js/views/add.js',
   './js/views/scan.js',
   './js/views/nutrients.js',
   './js/views/profile.js',
+  './js/views/coach.js',
+  './js/views/water.js',
   './js/views/settings.js',
   './js/views/onboarding.js',
   './js/vendor/preact.js',
@@ -47,7 +51,8 @@ self.addEventListener('fetch', (e) => {
   const url = new URL(req.url);
 
   if (url.origin === self.location.origin) {
-    e.respondWith(staleWhileRevalidate(req, req.mode === 'navigate'));
+    const heavy = /\/(data|icons|js\/vendor)\//.test(url.pathname);
+    e.respondWith(heavy ? staleWhileRevalidate(req, false) : networkFirst(req, req.mode === 'navigate'));
   } else if (url.hostname === 'fonts.googleapis.com' || url.hostname === 'fonts.gstatic.com') {
     e.respondWith(cacheFirst(req));
   }
@@ -61,6 +66,25 @@ async function staleWhileRevalidate(req, isNav) {
     .then((res) => { if (res.ok) cache.put(req, res.clone()); return res; })
     .catch(() => cached);
   return cached || network;
+}
+
+async function networkFirst(req, isNav) {
+  const cache = await caches.open(CACHE);
+  try {
+    const res = await fetchWithin(req, 4000);
+    if (res.ok) cache.put(req, res.clone());
+    return res;
+  } catch (err) {
+    return (await cache.match(req, { ignoreSearch: true })) || (isNav ? await cache.match('./index.html') : Response.error());
+  }
+}
+
+// A slow connection shouldn't make the app hang: fall back to the cache after a few seconds.
+function fetchWithin(req, ms) {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error('timeout')), ms);
+    fetch(req).then((r) => { clearTimeout(timer); resolve(r); }, (e) => { clearTimeout(timer); reject(e); });
+  });
 }
 
 async function cacheFirst(req) {

@@ -97,6 +97,71 @@ export async function estimateMeal({ apiKey, model, text, imageB64 }) {
   };
 }
 
+// ---- Coach chat ----
+
+const COACH_SCHEMA = {
+  type: 'object',
+  properties: {
+    reply: { type: 'string' },
+    actions: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          type: { type: 'string', enum: ['set_goal', 'set_style', 'adjust_calories'] },
+          value: { type: 'string' },
+          label: { type: 'string' },
+        },
+        required: ['type', 'value', 'label'],
+        additionalProperties: false,
+      },
+    },
+  },
+  required: ['reply', 'actions'],
+  additionalProperties: false,
+};
+
+const COACH_SYSTEM = `You are the nutrition coach inside Plate, a personal food, water, vitamin and weight tracker. You talk with one person about their eating. Their profile, targets, recent food log and weight trend are below, and they are current: rely on them instead of asking for numbers you already have.
+
+How to coach:
+- Be direct and practical, like a good coach texting a client. Lead with the answer, then the reason. Use their actual numbers.
+- Keep replies short: usually 2 to 5 sentences, or a short list of "- " bullets when listing foods or steps. Use **bold** sparingly for the key number. No headings, no tables.
+- Ground advice in mainstream sports nutrition: protein of 1.6 to 2.2 g per kg for people who lift, a 250 to 500 kcal surplus for building muscle, judging progress from the weekly weight trend rather than single weigh-ins.
+- Suggest specific, ordinary foods with rough portions and protein amounts.
+- When they ask about a diet change such as keto, explain what changes (where calories come from) and what stays the same (calories and protein), and what to expect.
+- You are not a doctor. If they mention a medical condition, medication, pregnancy, an eating disorder, or extreme plans (under about 1,200 kcal, fasting for days, losing more than 1% of bodyweight a week), give general guidance and suggest a doctor or registered dietitian.
+
+What Plate can do (offer these as actions when they fit, and only when the person would clearly want them):
+- set_goal, value one of: cut (lose fat, -500 kcal), cut_slow (-250), maintain, lean_bulk (build muscle, +300 kcal, high protein), bulk (+500).
+- set_style, value one of: balanced (30% fat), performance (higher carb, 20% fat), low_carb (about 100 g carbs), keto (25 g net carbs max). Style changes only carbs and fat; calories and protein stay the same. It applies from today on, so switching for a week and back is fine.
+- adjust_calories, value a whole number of kcal to add or subtract from the daily target, such as "150" or "-150". Use steps of 100 to 250.
+Each action needs a short button label, such as "Switch to keto" or "Add 150 kcal". Return an empty actions list when no change is needed. Never claim you made a change; the person taps the button to apply it.
+
+The person's data:
+`;
+
+export async function askCoach({ apiKey, model, history, context }) {
+  const client = await getClient(apiKey);
+  const params = {
+    model,
+    max_tokens: 8000,
+    system: COACH_SYSTEM + context,
+    messages: history.map((m) => ({ role: m.role, content: m.text })),
+    output_config: { effort: 'low', format: { type: 'json_schema', schema: COACH_SCHEMA } },
+  };
+  const msg = model === 'claude-haiku-5-5'
+    ? await client.messages.create(params)
+    : await client.beta.messages.create({ ...params, betas: ['server-side-fallback-2026-07-01'], fallbacks: 'default' });
+
+  if (msg.stop_reason === 'refusal') throw new AiError("The coach can't help with that one. Try asking another way.");
+  if (msg.stop_reason === 'max_tokens') throw new AiError('The answer got cut off. Try a narrower question.');
+  const block = msg.content.find((b) => b.type === 'text');
+  if (!block) throw new AiError('No answer came back. Try again.');
+  let data;
+  try { data = JSON.parse(block.text); } catch { throw new AiError('The answer came back garbled. Try again.'); }
+  return { reply: String(data.reply || '').trim(), actions: Array.isArray(data.actions) ? data.actions : [] };
+}
+
 export function aiErrorMessage(err) {
   if (err instanceof AiError) return err.message;
   const status = err?.status;

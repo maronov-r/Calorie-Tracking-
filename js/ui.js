@@ -30,6 +30,12 @@ const ICONS = {
   history: P('M4 12a8 8 0 1 0 2.3-5.6M4 4.5V8h3.5M12 8v4.5l3 2'),
   scale: html`<rect x="4" y="4" width="16" height="16" rx="4.5" /><path d="M8.6 10.2a3.6 3.6 0 0 1 6.8 0M12 10.4l1.3-1.7" />`,
   user: html`<circle cx="12" cy="8.5" r="3.6" /><path d="M5 19.5c1.3-3.5 4-5.1 7-5.1s5.7 1.6 7 5.1" />`,
+  chat: P('M5.5 5h13A1.5 1.5 0 0 1 20 6.5v8.5a1.5 1.5 0 0 1-1.5 1.5H11l-4.5 3.5v-3.5h-1A1.5 1.5 0 0 1 4 15V6.5A1.5 1.5 0 0 1 5.5 5z'),
+  send: P('M12 19V5.5M6.5 11L12 5.5l5.5 5.5'),
+  more: html`<circle cx="6" cy="12" r="1.3" fill="currentColor" /><circle cx="12" cy="12" r="1.3" fill="currentColor" /><circle cx="18" cy="12" r="1.3" fill="currentColor" />`,
+  glass: html`<path d="M6.5 4.5h11l-1.5 14.6a1 1 0 0 1-1 .9H9a1 1 0 0 1-1-.9z" /><path d="M7.4 11h9.2" />`,
+  bottle: html`<path d="M10 3.5h4M10.5 3.5v2.2L9 7.6a3 3 0 0 0-.7 1.9V19a1.5 1.5 0 0 0 1.5 1.5h4.4a1.5 1.5 0 0 0 1.5-1.5V9.5a3 3 0 0 0-.7-1.9l-1.5-1.9V3.5" /><path d="M8.3 12.5h7.4" />`,
+  tumbler: html`<path d="M5.5 7.5h11M6.3 7.5l1 12a1 1 0 0 0 1 .9h5.4a1 1 0 0 0 1-.9l1-12M11 7.5l1.8-4.5H15" /><path d="M16.2 10h1.3a2 2 0 0 1 2 2v2.5a2 2 0 0 1-2 2h-1.8" />`,
 };
 
 export const Icon = ({ name, size = 22, stroke = 1.8 }) => html`

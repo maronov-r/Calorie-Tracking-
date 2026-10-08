@@ -1,7 +1,7 @@
 // App state, persisted to IndexedDB on this device.
 import { useReducer, useEffect } from './vendor/preact.js';
 import { idbEntries, idbSet, idbClear, idbSetMany } from './lib/db.js';
-import { computeTargets, dayTotals, addInto, goalFor } from './nutrients.js';
+import { computeTargets, dayTotals, addInto, goalFor, styleFor, fmtKcal, ML_PER_OZ } from './nutrients.js';
 
 export const THEMES = [
   { value: 'oat', label: 'Oat', hint: 'Warm paper, forest green', color: '#F2EEE6', swatch: ['#F2EEE6', '#2F5D46', '#C4683F'] },
@@ -34,6 +34,7 @@ export const state = {
   recents: [],
   supplements: [],
   customFoods: [],
+  coach: [], // chat with the AI coach: { role, text, actions?, t }
   toast: null,
 };
 
@@ -70,6 +71,7 @@ export async function loadState() {
       else if (k === 'recents') state.recents = v;
       else if (k === 'supplements') state.supplements = v;
       else if (k === 'customFoods') state.customFoods = v;
+      else if (k === 'coach') state.coach = v;
     }
   } catch (err) {
     console.warn('Storage unavailable', err);
@@ -154,7 +156,43 @@ export function setSettings(patch) {
   emit();
 }
 
-export const getTargets = () => computeTargets(state.profile, state.settings.overrides);
+// Eating style is kept per date, so switching to keto for a week doesn't rewrite the targets of earlier days.
+export function styleOn(key = dateKey()) {
+  const styles = state.profile?.styles || {};
+  let best = null;
+  for (const k in styles) if (k <= key && (!best || k > best)) best = k;
+  return best ? styles[best] : 'balanced';
+}
+
+export const getTargets = (key) => computeTargets(state.profile, state.settings.overrides, styleOn(key));
+
+// Change the plan and say what it now means, so a goal switch never happens silently.
+export function updatePlan(patch, quiet = false) {
+  const before = getTargets();
+  const next = { ...state.profile, ...patch };
+  if (patch.goal && patch.goal !== state.profile.goal) { next.adjust = 0; next.adjustOn = null; } // a new goal starts fresh
+  setProfile(next);
+  const after = getTargets();
+  const ov = state.settings.overrides || {};
+  if (quiet) return;
+  const fixed = [ov.kcal && 'calorie', ov.protein && 'protein'].filter(Boolean);
+  if (fixed.length) {
+    // Hand-typed targets win over the goal; say so instead of leaving the change looking broken.
+    toast(`Your ${fixed.join(' and ')} ${fixed.length > 1 ? 'targets are' : 'target is'} set by hand in Settings, so ${fixed.length > 1 ? 'they' : 'it'} didn't change.`,
+      { label: 'Use automatic', run: () => setSettings({ overrides: { ...ov, kcal: undefined, protein: undefined } }) });
+  } else if (after.kcal !== before.kcal || after.protein !== before.protein || after.carbs !== before.carbs) {
+    toast(`New plan: ${fmtKcal(after.kcal)} kcal · ${after.protein} g protein`);
+  }
+}
+
+export function setStyle(style) {
+  const today = dateKey();
+  const styles = Object.fromEntries(Object.entries(state.profile.styles || {}).filter(([k]) => k < today));
+  styles[today] = style;
+  updatePlan({ styles }, true);
+  const t = getTargets();
+  toast(`${styleFor(style).label} from today: ${t.carbs} g ${t.netCarbs ? 'net carbs max' : 'carbs'}, ${t.fat} g fat`);
+}
 
 // ---- Weight ----
 
@@ -188,6 +226,22 @@ export function applyTheme(theme) {
   document.documentElement.setAttribute('data-theme', t.value);
   document.querySelector('meta[name=theme-color]')?.setAttribute('content', t.color);
   try { localStorage.setItem('plate-theme', t.value); } catch (e) { /* private mode */ }
+}
+
+// ---- Water bottles ----
+
+export const defaultBottles = (units) => (units === 'metric'
+  ? [{ id: 'glass', name: 'Glass', ml: 250, kind: 'glass' }, { id: 'bottle', name: 'Bottle', ml: 500, kind: 'bottle' }]
+  : [{ id: 'glass', name: 'Glass', ml: Math.round(8 * ML_PER_OZ), kind: 'glass' }, { id: 'bottle', name: 'Bottle', ml: 500, kind: 'bottle' }]);
+export const getBottles = () => state.settings.bottles || defaultBottles(state.settings.units);
+export const saveBottles = (bottles) => setSettings({ bottles });
+
+// ---- Coach chat ----
+
+export function setCoach(messages) {
+  state.coach = messages.slice(-40);
+  persist('coach', state.coach);
+  emit();
 }
 
 // ---- Recents, supplements, custom foods ----
@@ -267,6 +321,7 @@ export function exportData() {
     recents: state.recents,
     supplements: state.supplements,
     customFoods: state.customFoods,
+    coach: state.coach,
   };
 }
 
@@ -281,6 +336,7 @@ export async function importData(data) {
     ['recents', data.recents || []],
     ['supplements', data.supplements || []],
     ['customFoods', data.customFoods || []],
+    ['coach', data.coach || []],
     ...Object.entries(data.days).map(([k, v]) => ['d:' + k, v]),
   ];
   if (data.profile) pairs.push(['profile', data.profile]);
@@ -293,6 +349,7 @@ export async function importData(data) {
     recents: data.recents || [],
     supplements: data.supplements || [],
     customFoods: data.customFoods || [],
+    coach: data.coach || [],
   });
   applyTheme(settings.theme);
   emit();

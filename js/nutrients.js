@@ -67,7 +67,7 @@ export const ACTIVITY = [
 // delta: daily calories vs. maintenance. protein: g per kg of bodyweight.
 // pace: healthy weekly weight change in kg [low, high], used to coach from the weight trend.
 export const GOALS = [
-  { value: 'cut', label: 'Lose fat', hint: 'About 1 lb (0.5 kg) a week', delta: -500, protein: 2.0, pace: [-0.7, -0.25] },
+  { value: 'cut', label: 'Lose fat', hint: 'About 1 lb (0.5 kg) a week', delta: -500, protein: 2.2, pace: [-0.7, -0.25] },
   { value: 'cut_slow', label: 'Lose fat slowly', hint: 'About ½ lb a week, easier to keep muscle', delta: -250, protein: 2.0, pace: [-0.4, -0.08] },
   { value: 'maintain', label: 'Maintain', hint: 'Stay at your weight and get stronger', delta: 0, protein: 1.6, pace: [-0.15, 0.15] },
   { value: 'lean_bulk', label: 'Build muscle', hint: 'Lean bulk: small surplus, high protein', delta: 300, protein: 2.0, pace: [0.1, 0.25] },
@@ -77,30 +77,52 @@ const LEGACY_GOALS = { lose1: 'cut', lose05: 'cut_slow', gain05: 'lean_bulk', ga
 export const goalFor = (value) => GOALS.find((g) => g.value === (LEGACY_GOALS[value] || value)) || GOALS[2];
 export const isGaining = (value) => goalFor(value).delta > 0;
 
+// How the calories left after protein are split between carbs and fat. Calories and protein never change with style.
+export const STYLES = [
+  { value: 'balanced', label: 'Balanced', hint: 'A normal mix of carbs and fat' },
+  { value: 'performance', label: 'Higher carb', hint: 'More fuel for hard training, less fat' },
+  { value: 'low_carb', label: 'Low carb', hint: 'About 100 g of carbs, more fat' },
+  { value: 'keto', label: 'Keto', hint: 'Under 25 g net carbs, mostly fat' },
+];
+export const styleFor = (value) => STYLES.find((s) => s.value === value) || STYLES[0];
+export const KETO_NET_CARBS = 25;
+
 const round = (v, step = 1) => Math.round(v / step) * step;
 
-export function computeTargets(profile, overrides = {}) {
-  const { sex = 'female', age = 30, heightCm = 170, weightKg = 70, activity = 'light', goal = 'maintain' } = profile || {};
+// adjust (on the profile): calories the coach added or removed after checking your weight trend.
+export function computeTargets(profile, overrides = {}, style = 'balanced') {
+  const { sex = 'female', age = 30, heightCm = 170, weightKg = 70, activity = 'light', goal = 'maintain', adjust = 0 } = profile || {};
   const bmr = 10 * weightKg + 6.25 * heightCm - 5 * age + (sex === 'male' ? 5 : -161);
-  const factor = (ACTIVITY.find((a) => a.value === activity) || ACTIVITY[1]).factor;
+  const act = ACTIVITY.find((a) => a.value === activity) || ACTIVITY[1];
   const g = goalFor(goal);
   const floor = sex === 'male' ? 1500 : 1200;
-  const autoKcal = Math.max(floor, round(bmr * factor + g.delta, 10));
+  const tdee = round(bmr * act.factor, 10);
+  const autoKcal = Math.max(floor, round(bmr * act.factor + g.delta + adjust, 10));
   const kcal = overrides.kcal || autoKcal;
 
   // Capped so very heavy bodies don't get an unreachable protein target.
   const protein = overrides.protein || round(Math.min(weightKg, 120) * g.protein);
-  const fat = overrides.fat || round((kcal * 0.3) / 9);
-  const carbs = overrides.carbs || Math.max(50, round((kcal - protein * 4 - fat * 9) / 4));
+  const st = styleFor(style).value;
+  let fat;
+  let carbs;
+  if (st === 'keto' || st === 'low_carb') {
+    carbs = overrides.carbs || (st === 'keto' ? KETO_NET_CARBS : Math.min(125, Math.max(75, round((kcal * 0.13) / 4, 5))));
+    fat = overrides.fat || Math.max(40, round((kcal - protein * 4 - carbs * 4) / 9));
+  } else {
+    fat = overrides.fat || round((kcal * (st === 'performance' ? 0.2 : 0.3)) / 9);
+    carbs = overrides.carbs || Math.max(50, round((kcal - protein * 4 - fat * 9) / 4));
+  }
   const water = overrides.water || Math.min(4000, Math.max(2000, round(weightKg * 35, 250)));
 
   const t = {
     kcal, protein, carbs, fat, water,
+    style: st,
+    netCarbs: st === 'keto', // on keto the carb target is a ceiling on carbs minus fiber
     fiber: round((kcal / 1000) * 14),
     satfat: round((kcal * 0.1) / 9),
     sodium: 2300,
     sugar: 0,
-    auto: { kcal: autoKcal, bmr: Math.round(bmr), tdee: round(bmr * factor, 10) },
+    auto: { kcal: autoKcal, bmr: Math.round(bmr), tdee, factor: act.factor, delta: g.delta, adjust },
   };
   const table = DRI[sex === 'male' ? 'male' : 'female'];
   const b = band(age);
@@ -110,6 +132,8 @@ export function computeTargets(profile, overrides = {}) {
   }
   return t;
 }
+
+export const ageBand = (age) => ['14–18', '19–30', '31–50', '51–70', '71+'][band(age)];
 
 // ---- Math on nutrient maps ----
 
