@@ -3,6 +3,7 @@ import { useStore, saveSupplement, deleteSupplement } from '../store.js';
 import { Icon, Sheet, NumberInput } from '../ui.js';
 import { N, SUPP_FIELDS, SUPP_PRESETS, fmtNum } from '../nutrients.js';
 import { readSupplementLabel, prepareImage, aiErrorMessage } from '../ai.js';
+import { DEMO } from '../demo.js';
 
 // One line for lists: tracked nutrients first, then anything else on the label.
 export function suppSummary(sp) {
@@ -74,7 +75,9 @@ function SupplementForm({ supp, close, toSettings }) {
     <div class="sheet-body form">
       <div class="scan-label">
         <input ref=${fileRef} type="file" accept="image/*" capture="environment" hidden onChange=${onPhoto} />
-        ${hasKey
+        ${DEMO
+          ? html`<button type="button" class="btn btn-quiet btn-block" disabled><${Icon} name="camera" size=${18} /> Label scan: about 1¢ in the full version</button>`
+          : hasKey
           ? html`<button type="button" class="btn btn-quiet btn-block" disabled=${scan.busy} onClick=${() => fileRef.current.click()}>
               ${scan.busy ? html`<span class="spinner" /> Reading the label…` : html`<${Icon} name="camera" size=${18} /> Scan the label`}
             </button>`

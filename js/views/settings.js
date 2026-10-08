@@ -7,6 +7,8 @@ import { Icon, Segmented, NumberInput } from '../ui.js';
 import { dailyFor, workoutTypeFor, experienceFor, normalizeProfile, ML_PER_OZ, fmtNum, fmtKcal, computeTargets, goalFor, styleFor, KG_PER_LB } from '../nutrients.js';
 import { suppSummary } from './supplements.js';
 import { AI_MODELS } from '../ai.js';
+import { DEMO } from '../demo.js';
+import { CreditCard } from './credit.js';
 
 
 // Profile inputs, shared by onboarding and settings. Calls onChange only with valid values.
@@ -179,7 +181,7 @@ export function SettingsView({ go, section, openSheet }) {
       </div>
     </section>
 
-    <section class="card set-section" id="ai">
+    ${DEMO ? html`<${CreditCard} openSheet=${openSheet} />` : html`<section class="card set-section" id="ai">
       <h2 class="card-title">AI food logging</h2>
       <p class="fine">Describe a meal or snap a photo and Claude estimates it, vitamins included. It uses your own Anthropic API key, which never leaves this phone except to talk to Anthropic. You pay per use, with no subscription.</p>
       <label class="field">
@@ -195,7 +197,7 @@ export function SettingsView({ go, section, openSheet }) {
         <span class="field-label">Model</span>
         <${ChoiceList} options=${AI_MODELS.map((m) => ({ value: m.id, label: m.label, hint: m.hint }))} value=${s.settings.model} onChange=${(v) => setSettings({ model: v })} />
       </div>
-    </section>
+    </section>`}
 
     <section class="card set-section">
       <h2 class="card-title">Supplements</h2>

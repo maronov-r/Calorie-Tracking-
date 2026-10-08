@@ -8,6 +8,7 @@ import {
 } from '../foods.js';
 import { fmtKcal, fmtNum, fmtQty, NUTRIENTS, N } from '../nutrients.js';
 import { estimateMeal, aiErrorMessage, prepareImage, AI_MODELS } from '../ai.js';
+import { DEMO } from '../demo.js';
 import { ScanPane } from './scan.js';
 
 export function AddSheet({ dateKey, meal, mode, query, onClose, toSettings }) {
@@ -210,6 +211,17 @@ function AiPane({ initialText, onLog, toSettings }) {
   const [res, setRes] = useState(null);
   const fileRef = useRef();
   const model = AI_MODELS.find((m) => m.id === s.settings.model) || AI_MODELS[0];
+
+  if (DEMO) {
+    return html`
+      <div class="sheet-body">
+        <${Empty} icon="sparkle" title="Describe meals in plain words">
+          Type “turkey sandwich and an apple” or snap a photo of your plate, and the AI fills in calories, macros and vitamins.
+          <br /><br />
+          In the full version this uses your coach credit, about 1¢ a meal. This demo only charges for the coach, so try that from the Profile tab.
+        <//>
+      </div>`;
+  }
 
   if (!s.settings.apiKey) {
     return html`

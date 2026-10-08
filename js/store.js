@@ -3,6 +3,8 @@ import { useReducer, useEffect } from './vendor/preact.js';
 import { idbEntries, idbSet, idbClear, idbSetMany } from './lib/db.js';
 import { computeTargets, dayTotals, addInto, normalizeProfile, styleFor, fmtKcal, ML_PER_OZ } from './nutrients.js';
 
+const THEME_KEY = globalThis.PLATE_DEMO ? 'plate-demo-theme' : 'plate-theme';
+
 export const THEMES = [
   { value: 'oat', label: 'Oat', hint: 'Warm paper, forest green', color: '#F2EEE6', swatch: ['#F2EEE6', '#2F5D46', '#C4683F'] },
   { value: 'midnight', label: 'Midnight', hint: 'Dark, with a lime glow', color: '#0A0B0D', swatch: ['#0A0B0D', '#C8F169', '#FF8C6B'] },
@@ -35,6 +37,7 @@ export const state = {
   supplements: [],
   customFoods: [],
   coach: [], // chat with the AI coach: { role, text, actions?, t }
+  wallet: null, // demo only: pretend coach credit
   toast: null,
 };
 
@@ -72,6 +75,7 @@ export async function loadState() {
       else if (k === 'supplements') state.supplements = v;
       else if (k === 'customFoods') state.customFoods = v;
       else if (k === 'coach') state.coach = v;
+      else if (k === 'wallet') state.wallet = v;
     }
   } catch (err) {
     console.warn('Storage unavailable', err);
@@ -238,7 +242,7 @@ export function applyTheme(theme) {
   const t = THEMES.find((x) => x.value === theme) || THEMES[0];
   document.documentElement.setAttribute('data-theme', t.value);
   document.querySelector('meta[name=theme-color]')?.setAttribute('content', t.color);
-  try { localStorage.setItem('plate-theme', t.value); } catch (e) { /* private mode */ }
+  try { localStorage.setItem(THEME_KEY, t.value); } catch (e) { /* private mode */ }
 }
 
 // ---- Water bottles ----
@@ -258,6 +262,12 @@ export function setCoach(messages) {
 }
 
 // ---- Recents, supplements, custom foods ----
+
+export function setWallet(w) {
+  state.wallet = w;
+  persist('wallet', w);
+  emit();
+}
 
 export function pushRecent(food, unitIdx, amount) {
   const key = `${food.src}:${food.ref ?? food.name}`;
@@ -370,7 +380,7 @@ export async function importData(data) {
 
 export async function eraseAll() {
   await idbClear();
-  try { localStorage.removeItem('plate-theme'); } catch (e) { /* ignore */ }
+  try { localStorage.removeItem(THEME_KEY); } catch (e) { /* ignore */ }
   location.reload();
 }
 

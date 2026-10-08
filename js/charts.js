@@ -103,7 +103,7 @@ export function WeightChart({ points, from, to, units }) {
 }
 
 // One column per day. `days`: [{ key, value, logged }]
-export function IntakeChart({ days, goal, unit, color, todayKey }) {
+export function IntakeChart({ days, goal, unit, label, color, todayKey }) {
   const ref = useRef();
   const W = useWidth(ref);
   const H = 170;
@@ -131,7 +131,7 @@ export function IntakeChart({ days, goal, unit, color, todayKey }) {
 
   return html`
     <div class="chart" ref=${ref}>
-      <svg width=${W} height=${H} role="img" aria-label=${`Daily ${unit === 'kcal' ? 'calories' : 'protein'} for the last ${days.length} days, goal ${fmt(goal)} ${unit}`}
+      <svg width=${W} height=${H} role="img" aria-label=${`Daily ${label} for the last ${days.length} days, goal ${fmt(goal)} ${unit}`}
         onPointerLeave=${() => setHover(null)}>
         ${ticks.map((t) => html`
           <line x1=${pad.l} x2=${W - pad.r} y1=${y(t)} y2=${y(t)} class="grid" />

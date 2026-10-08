@@ -1,5 +1,5 @@
 // Minimal IndexedDB key-value store. All app data lives on this device only.
-const DB_NAME = 'plate';
+const DB_NAME = globalThis.PLATE_DEMO ? 'plate-demo' : 'plate'; // the demo never touches real data
 const STORE = 'kv';
 let dbPromise;
 

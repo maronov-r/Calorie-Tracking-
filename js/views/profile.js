@@ -124,6 +124,7 @@ export function ProfileView({ openSheet, go }) {
         <${Segmented} className="seg-sm" options=${[{ value: focus, label: flabel }, { value: 'kcal', label: 'Calories' }]} value=${metric} onChange=${setMetric} />
       </div>
       <${IntakeChart} days=${days} goal=${metric === 'kcal' ? t.kcal : t[focus]} unit=${metric === 'kcal' ? 'kcal' : 'g'}
+        label=${metric === 'kcal' ? 'calories' : flabel.toLowerCase()}
         color=${metric === 'kcal' ? 'var(--chart-kcal)' : `var(--chart-${focus})`} todayKey=${today} />
       <div class="hits">
         <span class="hits-label">${fdir === 'max' ? `Stayed under ${flabel.toLowerCase()}` : `${flabel} goal hit`}</span>

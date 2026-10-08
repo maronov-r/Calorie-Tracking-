@@ -9,6 +9,8 @@ import { goalGuide, styleGuide, planSteps, coachContext, lookUpFoods, resolveMea
 import { loadFoods, foodsReady, makeEntry, fullName } from '../foods.js';
 import { askCoach, aiErrorMessage } from '../ai.js';
 import { ChoiceList } from './settings.js';
+import { DEMO, wallet, charge, demoReply, replyCost, fmtMoney, fmtCents, LOW_CENTS } from '../demo.js';
+import { PrivacyPane, TopUp } from './credit.js';
 
 const Paras = ({ list }) => html`<div class="prose">${list.map((p) => html`<p>${p}</p>`)}</div>`;
 
@@ -206,7 +208,10 @@ function Coach({ close, toSettings }) {
   const [error, setError] = useState('');
   const listRef = useRef();
   const msgs = s.coach;
-  const hasKey = !!s.settings.apiKey;
+  const hasKey = DEMO || !!s.settings.apiKey;
+  // Demo: the privacy screen comes first, and the checkout opens right here in the chat.
+  const credit = DEMO ? wallet().cents : null;
+  const [view, setView] = useState(DEMO && !wallet().seenPrivacy ? 'privacy' : 'chat');
   const [, setDbReady] = useState(!!foodsReady());
   useEffect(() => { loadFoods().then(() => setDbReady(true)).catch(() => {}); }, []);
 
@@ -217,7 +222,7 @@ function Coach({ close, toSettings }) {
 
   const send = async (q) => {
     const question = (q ?? text).trim();
-    if (!question || busy) return;
+    if (!question || busy || (DEMO && credit <= 0)) return;
     setError('');
     setText('');
     const history = [...state.coach, { role: 'user', text: question, t: Date.now() }];
@@ -231,8 +236,11 @@ function Coach({ close, toSettings }) {
         if (name !== 'look_up_foods') throw new Error(`Unknown tool ${name}`);
         return lookUpFoods(input);
       };
-      const res = await askCoach({ apiKey: s.settings.apiKey, model: s.settings.model, history: recent.map(withMeals), context: coachContext(), runTool });
-      setCoach([...state.coach, { role: 'assistant', text: res.reply || 'Sorry, I lost my train of thought. Ask me again?', meals: res.meals, actions: res.actions, t: Date.now() }]);
+      const res = DEMO
+        ? await demoReply(question)
+        : await askCoach({ apiKey: s.settings.apiKey, model: s.settings.model, history: recent.map(withMeals), context: coachContext(), runTool });
+      const cost = DEMO ? charge(replyCost(res), 'Coach answer') : undefined;
+      setCoach([...state.coach, { role: 'assistant', text: res.reply || res.text || 'Sorry, I lost my train of thought. Ask me again?', meals: res.meals, actions: res.actions, cost, t: Date.now() }]);
     } catch (err) {
       setCoach(state.coach.slice(0, -1)); // drop the unanswered question so the chat stays in turn
       setText(question);
@@ -258,14 +266,16 @@ function Coach({ close, toSettings }) {
 
   return html`
     <div class="sheet-head">
-      ${msgs.length > 0 && !busy
+      ${msgs.length > 0 && !busy && view === 'chat'
         ? html`<button type="button" class="link head-link" onClick=${() => setCoach([])}>Clear</button>`
         : html`<span class="icon-btn-spacer" />`}
-      <span class="sheet-head-title">Coach</span>
+      <span class="sheet-head-title">Coach${DEMO && html` <button type="button" class="credit-pill" onClick=${() => setView('topup')}>${fmtMoney(credit)}</button>`}</span>
       <button type="button" class="icon-btn" onClick=${close} aria-label="Close"><${Icon} name="close" /></button>
     </div>
     <div class="sheet-body chat" ref=${listRef}>
-      ${!hasKey ? html`
+      ${view === 'privacy' ? html`<${PrivacyPane} onDone=${() => setView('chat')} />`
+      : view === 'topup' ? html`<${TopUp} onDone=${() => setView('chat')} onCancel=${() => setView('chat')} />`
+      : !hasKey ? html`
         <${Empty} icon="chat" title="Ask anything about your eating">
           The coach knows your goal, targets, food log and weight trend, and can change your plan when you ask. It looks foods up in Plate's USDA database instead of guessing. It uses Claude through your own API key, at a few cents a question.
         <//>
@@ -277,6 +287,7 @@ function Coach({ close, toSettings }) {
           <div class="starters">
             ${STARTERS.map((q) => html`<button type="button" class="chip" onClick=${() => send(q)}>${q}</button>`)}
           </div>
+          ${DEMO && html`<button type="button" class="link pp-link" onClick=${() => setView('privacy')}>What does the coach see?</button>`}
         </div>
       ` : msgs.map((m, mi) => (m.role === 'user'
         ? html`<div class="bubble me">${m.text}</div>`
@@ -290,11 +301,20 @@ function Coach({ close, toSettings }) {
                   ? html`<span class="chip static done"><${Icon} name="check" size=${15} stroke=${2.4} /> ${a.label}</span>`
                   : html`<button type="button" class="chip chip-accent" onClick=${() => tapAction(mi, ai)}>${a.label}</button>`))}
               </div>`}
+            ${m.cost != null && html`<p class="cost-line">This answer used ${fmtCents(m.cost)}</p>`}
           </div>`))}
       ${busy && html`<div class="bubble coach typing" aria-label="Coach is typing"><i /><i /><i /></div>`}
       ${error && html`<p class="error center">${error}</p>`}
     </div>
-    ${hasKey && html`
+    ${DEMO && view === 'chat' && credit > 0 && credit <= LOW_CENTS && html`
+      <div class="low-credit">Running low: ${fmtCents(credit)} left <button type="button" class="link" onClick=${() => setView('topup')}>Add credit</button></div>`}
+    ${DEMO && view === 'chat' && credit <= 0 && html`
+      <div class="chat-lock">
+        <b>You're out of coach credit</b>
+        <span>Everything else in Plate stays free.</span>
+        <button type="button" class="btn btn-primary btn-block" onClick=${() => setView('topup')}>Add credit</button>
+      </div>`}
+    ${hasKey && view === 'chat' && !(DEMO && credit <= 0) && html`
       <form class="chat-input" onSubmit=${(e) => { e.preventDefault(); send(); }}>
         <textarea rows="1" value=${text} placeholder="Ask your coach…" enterkeyhint="send"
           onInput=${(e) => { setText(e.currentTarget.value); e.currentTarget.style.height = 'auto'; e.currentTarget.style.height = Math.min(120, e.currentTarget.scrollHeight) + 'px'; }}
