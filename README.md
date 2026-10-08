@@ -23,7 +23,7 @@ A calm, private calorie tracker for your phone. It tracks calories, macros, wate
   - **Describe** a meal in words or snap a photo, and Claude estimates it (needs your own API key, see below).
 - **Nutrients:** see today or a 7-day average against the U.S. Recommended Dietary Allowances for your age and sex. Tap any nutrient to see where yours came from and which foods are good sources.
 - **Supplements:** add what you take once, by scanning the label with Claude or typing it in, then tick it off each day. Vitamins and minerals count toward your targets; anything else (creatine, fish oil, biotin, herbs) is totaled per day.
-- **Goals:** Lose fat, Lose fat slowly, Maintain, Build muscle (lean bulk, +300 kcal) or Bulk. Protein is 0.9 g per lb of bodyweight for every goal except Maintain (0.7 g per lb). Targets are calculated from your age, sex, height, weight and activity level (Mifflin–St Jeor), follow your latest weigh-in, and can be overridden.
+- **Goals:** Lose fat, Lose fat slowly, Maintain, Build muscle (lean bulk, +300 kcal) or Bulk. Protein follows the research: about 1.6 g per kg for lifters maintaining or gaining (where extra protein stops adding muscle), more when cutting (it protects muscle in a deficit), less without strength training, and at least 1.2 g per kg from age 65. It's based on lean mass when you enter your body fat %, or on an adjusted weight above a BMI of 25, since body fat doesn't need protein. Targets are calculated from your age, sex, height, weight and activity level (Mifflin–St Jeor), follow your latest weigh-in, and can be overridden.
 - **Themes:** Oat (default), Midnight and Porcelain. Change them in Settings.
 
 ## AI logging (optional)

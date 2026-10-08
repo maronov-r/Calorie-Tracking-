@@ -64,17 +64,60 @@ export const ACTIVITY = [
   { value: 'athlete', label: 'Athlete', hint: 'Physical job or training twice a day', factor: 1.9 },
 ];
 
-// delta: daily calories vs. maintenance. protein: g per kg of bodyweight, the same 2.0 (0.9 g per lb)
-// for every goal that changes your body; only maintaining needs less.
+// delta: daily calories vs. maintenance. Protein is set separately (see PROTEIN below).
 // pace: healthy weekly weight change in kg [low, high], used to coach from the weight trend.
 // focus: what the Today screen shows next to calories by default.
 export const GOALS = [
-  { value: 'cut', label: 'Lose fat', hint: 'About 1 lb (0.5 kg) a week', delta: -500, protein: 2.0, pace: [-0.7, -0.25], focus: 'fat' },
-  { value: 'cut_slow', label: 'Lose fat slowly', hint: 'About ½ lb a week, easier to keep muscle', delta: -250, protein: 2.0, pace: [-0.4, -0.08], focus: 'fat' },
-  { value: 'maintain', label: 'Maintain', hint: 'Stay at your weight and get stronger', delta: 0, protein: 1.6, pace: [-0.15, 0.15], focus: 'protein' },
-  { value: 'lean_bulk', label: 'Build muscle', hint: 'Lean bulk: small surplus, high protein', delta: 300, protein: 2.0, pace: [0.1, 0.25], focus: 'protein' },
-  { value: 'bulk', label: 'Bulk', hint: 'Faster gain, with some fat along the way', delta: 500, protein: 2.0, pace: [0.2, 0.5], focus: 'protein' },
+  { value: 'cut', label: 'Lose fat', hint: 'About 1 lb (0.5 kg) a week', delta: -500, pace: [-0.7, -0.25], focus: 'fat' },
+  { value: 'cut_slow', label: 'Lose fat slowly', hint: 'About ½ lb a week, easier to keep muscle', delta: -250, pace: [-0.4, -0.08], focus: 'fat' },
+  { value: 'maintain', label: 'Maintain', hint: 'Stay at your weight and get stronger', delta: 0, pace: [-0.15, 0.15], focus: 'protein' },
+  { value: 'lean_bulk', label: 'Build muscle', hint: 'Lean bulk: small surplus, high protein', delta: 300, pace: [0.1, 0.25], focus: 'protein' },
+  { value: 'bulk', label: 'Bulk', hint: 'Faster gain, with some fat along the way', delta: 500, pace: [0.2, 0.5], focus: 'protein' },
 ];
+// ---- Protein ----
+// Strength training is the biggest factor in how much protein actually helps, so it's asked directly.
+export const TRAINING = [
+  { value: 'lift', label: 'Yes, regularly', hint: 'Strength training twice a week or more' },
+  { value: 'some', label: 'Sometimes', hint: 'Now and then, or just getting started' },
+  { value: 'none', label: 'No', hint: 'Cardio, sports or no exercise, but no weights' },
+];
+
+// Grams per kg of reference weight (below), by training and goal. From the research:
+// - Lifting while maintaining or gaining: ~1.6 g/kg is where extra protein stops adding muscle
+//   (Morton et al. 2018, 49 trials). A calorie surplus doesn't raise that.
+// - Lifting while losing fat: as much or more, since protein protects muscle in a deficit
+//   (ISSN 2017: 1.4–2.0 g/kg for most, more for lean dieting lifters).
+// - Not lifting: 1.2–1.6 g/kg while losing weight preserves lean mass (AJCN 2015 review);
+//   about 1.0 at maintenance, above the 0.8 RDA minimum.
+const PROTEIN = {
+  lift: { cut: 2.0, cut_slow: 1.8, maintain: 1.6, lean_bulk: 1.6, bulk: 1.6 },
+  some: { cut: 1.6, cut_slow: 1.5, maintain: 1.3, lean_bulk: 1.5, bulk: 1.5 },
+  none: { cut: 1.4, cut_slow: 1.3, maintain: 1.0, lean_bulk: 1.2, bulk: 1.2 },
+};
+
+// Building muscle only works with lifting, so that's the sensible guess until someone answers.
+export const trainingFor = (profile) => profile?.training || (goalFor(profile?.goal).delta > 0 ? 'lift' : 'some');
+
+// Body fat doesn't need protein, so multiplying total weight overestimates for bigger bodies.
+// - Body fat % known: lean mass scaled to a typical healthy body fat (15% men, 25% women), never above actual weight.
+// - Otherwise, above a BMI of 25: adjusted weight = BMI-25 weight + 25% of the rest (clinical practice).
+export function proteinBasis(profile) {
+  const { weightKg = 70, heightCm = 170, sex = 'female', bodyFat } = profile || {};
+  if (bodyFat >= 3 && bodyFat <= 60) {
+    const lean = weightKg * (1 - bodyFat / 100);
+    return { kg: Math.min(weightKg, lean / (sex === 'male' ? 0.85 : 0.75)), how: 'bodyfat', lean };
+  }
+  const h = heightCm / 100;
+  const healthy = 25 * h * h;
+  if (weightKg > healthy) return { kg: healthy + 0.25 * (weightKg - healthy), how: 'adjusted', healthy };
+  return { kg: weightKg, how: 'weight' };
+}
+
+export function proteinPerKg(profile) {
+  const per = PROTEIN[trainingFor(profile)][goalFor(profile?.goal).value];
+  return (profile?.age || 30) >= 65 ? Math.max(per, 1.2) : per; // PROT-AGE: older adults need at least 1.0–1.2
+}
+
 // ---- What to put front and center on Today ----
 
 export const FOCUS = [
@@ -138,8 +181,9 @@ export function computeTargets(profile, overrides = {}, style = 'balanced') {
   const autoKcal = Math.max(floor, round(bmr * act.factor + g.delta + adjust, 10));
   const kcal = overrides.kcal || autoKcal;
 
-  // Capped so very heavy bodies don't get an unreachable protein target.
-  const protein = overrides.protein || round(Math.min(weightKg, 120) * g.protein);
+  const basis = proteinBasis(profile);
+  const perKg = proteinPerKg(profile);
+  const protein = overrides.protein || round(basis.kg * perKg);
   const st = styleFor(style).value;
   let fat;
   let carbs;
@@ -160,7 +204,7 @@ export function computeTargets(profile, overrides = {}, style = 'balanced') {
     satfat: round((kcal * 0.1) / 9),
     sodium: 2300,
     sugar: 0,
-    auto: { kcal: autoKcal, bmr: Math.round(bmr), tdee, factor: act.factor, delta: g.delta, adjust },
+    auto: { kcal: autoKcal, bmr: Math.round(bmr), tdee, factor: act.factor, delta: g.delta, adjust, protein: { ...basis, perKg } },
   };
   const table = DRI[sex === 'male' ? 'male' : 'female'];
   const b = band(age);

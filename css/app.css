@@ -1396,3 +1396,4 @@ svg { flex-shrink: 0; }
 .nrow.static { cursor: default; }
 .nrow-name small { display: block; font-size: 12px; color: var(--ink-3); font-weight: 400; margin-top: 1px; }
 .card-title .card-meta { margin-left: 6px; font-weight: 500; }
+.ob-h2 { font-size: 20px; font-weight: 650; margin: 26px 0 4px; }

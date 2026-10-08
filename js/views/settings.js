@@ -4,7 +4,7 @@ import {
   exportData, importData, eraseAll, toast, dateKey as todayKey,
 } from '../store.js';
 import { Icon, Segmented, NumberInput } from '../ui.js';
-import { ACTIVITY, ML_PER_OZ, fmtNum, fmtKcal, computeTargets, goalFor, styleFor, KG_PER_LB } from '../nutrients.js';
+import { ACTIVITY, TRAINING, trainingFor, ML_PER_OZ, fmtNum, fmtKcal, computeTargets, goalFor, styleFor, KG_PER_LB } from '../nutrients.js';
 import { suppSummary } from './supplements.js';
 import { AI_MODELS } from '../ai.js';
 
@@ -144,6 +144,13 @@ export function SettingsView({ go, section, openSheet }) {
           ${ACTIVITY.map((a) => html`<option value=${a.value}>${a.label}: ${a.hint}</option>`)}
         </select>
       </div>
+      <div class="field">
+        <span class="field-label">Strength training <span class="field-hint">sets your protein</span></span>
+        <${Segmented} options=${TRAINING.map((x) => ({ value: x.value, label: x.value === 'lift' ? 'Regularly' : x.label }))} value=${trainingFor(p)}
+          onChange=${(v) => updatePlan({ training: v })} />
+      </div>
+      <${NumberInput} className="field" label="Body fat % (optional, makes protein more exact)" value=${p.bodyFat || ''} placeholder="e.g. 18" suffix="%"
+        onChange=${(v) => (v === '' || (v >= 3 && v <= 60)) && updatePlan({ bodyFat: v || null })} />
       <div class="field">
         <span class="field-label">Goal and eating style</span>
         <button type="button" class="select-row" onClick=${() => openSheet({ type: 'plan' })}>

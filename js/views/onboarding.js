@@ -1,7 +1,7 @@
 import { html, useState } from '../vendor/preact.js';
 import { setProfile, setSettings, setWeight, dateKey as todayKey } from '../store.js';
 import { Icon, Ring, Segmented } from '../ui.js';
-import { ACTIVITY, GOALS, MICROS, ML_PER_OZ, computeTargets, fmtKcal } from '../nutrients.js';
+import { ACTIVITY, TRAINING, GOALS, MICROS, ML_PER_OZ, computeTargets, fmtKcal } from '../nutrients.js';
 import { ProfileFields, ChoiceList } from './settings.js';
 
 export function Onboarding() {
@@ -60,7 +60,10 @@ export function Onboarding() {
         <h1 class="ob-h">How active are you?</h1>
         <p class="ob-sub">Think about a typical week.</p>
         <${ChoiceList} options=${ACTIVITY} value=${p.activity} onChange=${(v) => upd({ activity: v })} />
-        ${nav(() => setStep(3))}
+        <h2 class="ob-h2">Do you lift weights?</h2>
+        <p class="ob-sub">It's the biggest factor in how much protein you need.</p>
+        <${ChoiceList} options=${TRAINING} value=${p.training} onChange=${(v) => upd({ training: v })} />
+        ${nav(() => setStep(3), !p.training)}
       </div>`;
   }
 

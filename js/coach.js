@@ -4,7 +4,7 @@ import {
   state, getTargets, styleOn, weighIns, latestWeighIn, getDay, totalsFor, weekAverage, mealLabel, dateKey as todayKey, shiftKey,
 } from './store.js';
 import {
-  goalFor, styleFor, ACTIVITY, GOALS, STYLES, MICROS, KG_PER_LB, KETO_NET_CARBS, fmtKcal, fmtWater, ageBand, scale, addInto,
+  goalFor, styleFor, ACTIVITY, TRAINING, trainingFor, GOALS, STYLES, MICROS, KG_PER_LB, KETO_NET_CARBS, fmtKcal, fmtWater, ageBand, scale, addInto,
   focusFor, directionOf, macroLabel, macroValue, dayMet,
 } from './nutrients.js';
 import { weeklyRate, dayNum, fmtRate } from './weight.js';
@@ -21,8 +21,7 @@ const paceRange = (g, units) => {
 
 export function goalGuide(goalValue, t, units) {
   const g = goalFor(goalValue);
-  const perLb = (t.protein / lb(state.profile.weightKg)).toFixed(1);
-  const protein = `Eat ${t.protein} g of protein every day, about ${perLb} g per lb of bodyweight. Spread it over 3 to 5 meals of 30 to 50 g each.`;
+  const protein = `Eat ${t.protein} g of protein every day. Spread it over 3 to 5 meals of 30 to 50 g each. "How it's worked out" shows where the number comes from.`;
   const pace = paceRange(g, units);
   switch (g.value) {
     case 'lean_bulk': return [
@@ -48,7 +47,7 @@ export function goalGuide(goalValue, t, units) {
     default: return [
       'A cut means eating about 500 kcal less than you burn. Calories are what decide fat loss, so they come first. Fat is the easiest place to save them (9 kcal a gram, more than double protein or carbs), so your Today screen shows it next to calories as a limit to stay under.',
       `Aim to lose ${pace} a week. Losing faster than that tends to cost muscle.`,
-      `${protein} Keeping protein up while you eat less is what makes the weight you lose fat rather than muscle, so keep lifting too.`,
+      `${protein} Protein matters as much on a cut as on a bulk: with less food coming in, it's what makes the weight you lose fat rather than muscle. Keep lifting too.`,
     ];
   }
 }
@@ -94,12 +93,32 @@ export function planSteps(t, units) {
   ];
   if (t.auto.adjust) steps.push({ label: 'Coach adjustment', value: `${sign(t.auto.adjust)} kcal`, note: `Added ${p.adjustOn ? `on ${new Date(p.adjustOn + 'T12:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} ` : ''}after checking your weight trend.` });
   steps.push({ label: 'Daily calories', value: `${fmtKcal(t.kcal)} kcal`, total: true, note: ov.kcal ? 'You set this by hand in Settings, so the steps above don’t change it.' : '' });
-  steps.push({ label: 'Protein', value: `${t.protein} g`, note: ov.protein ? 'Set by hand in Settings.' : `${g.protein} g per kg of bodyweight (${(g.protein * KG_PER_LB).toFixed(1)} g per lb)${p.weightKg > 120 ? ', counted up to 120 kg' : ''}. Protein has 4 kcal per gram.` });
+  steps.push({ label: 'Protein', value: `${t.protein} g`, note: ov.protein ? 'Set by hand in Settings.' : proteinNote(t, units) });
   steps.push({ label: t.netCarbs ? 'Net carbs (max)' : 'Carbs', value: `${t.carbs} g`, note: ov.carbs ? 'Set by hand in Settings.' : `From your eating style, ${styleFor(t.style).label}.` });
   steps.push({ label: 'Fat', value: `${t.fat} g`, note: ov.fat ? 'Set by hand in Settings.' : 'Whatever calories are left after protein and carbs, at 9 kcal per gram.' });
   steps.push({ label: 'Water', value: fmtWater(t.water, units), note: ov.water ? 'Set by hand in Settings.' : 'About 35 ml per kg of bodyweight, between 2 and 4 liters.' });
   steps.push({ label: 'Vitamins & minerals', value: `${MICROS.length} targets`, note: `The U.S. Recommended Dietary Allowances for ${p.sex === 'male' ? 'men' : 'women'} aged ${ageBand(p.age)}.` });
   return steps;
+}
+
+// Plain-language reasoning behind the protein number.
+function proteinNote(t, units) {
+  const p = state.profile;
+  const b = t.auto.protein;
+  const w = (kg) => (units === 'metric' ? `${kg.toFixed(1)} kg` : `${lb(kg).toFixed(0)} lb`);
+  const train = trainingFor(p);
+  const g = goalFor(p.goal);
+  const base = b.how === 'bodyfat'
+    ? `Based on your lean mass (${w(b.lean)} at ${p.bodyFat}% body fat), scaled to a typical healthy body fat: ${w(b.kg)}.`
+    : b.how === 'adjusted'
+      ? `Based on ${w(b.kg)} rather than your full ${w(p.weightKg)}: body fat doesn't need protein, so the part of your weight above a BMI of 25 counts at a quarter. Add your body fat % in Settings for a more exact number.`
+      : `Based on your bodyweight, ${w(p.weightKg)}.`;
+  const why = train === 'lift'
+    ? (g.delta < 0 ? 'Lifters losing fat need the most protein: it protects muscle while you eat less.' : 'For lifters, about 1.6 g per kg is where extra protein stops adding muscle, even in a surplus.')
+    : train === 'some'
+      ? 'You lift sometimes, so this sits between the lifter and non-lifter amounts.'
+      : (g.delta < 0 ? 'Without weights, about 1.2–1.6 g per kg still helps keep muscle while losing weight.' : 'Without weights, needs are lower; lifting is what makes extra protein pay off.');
+  return `${base} × ${b.perKg} g per kg${units === 'metric' ? '' : ` (${(b.perKg * KG_PER_LB).toFixed(2)} g per lb)`}. ${why}${p.age >= 65 ? ' At 65 and over it never drops below 1.2 g per kg.' : ''} Protein has 4 kcal per gram.`;
 }
 
 // ---- Calorie check-ins from the weight trend ----
@@ -297,6 +316,7 @@ export function coachContext(today = todayKey()) {
     `Today is ${today}. The user prefers ${units === 'metric' ? 'metric units (kg, ml)' : 'US units (lb, oz)'}.`,
     `Profile: ${p.sex}, ${p.age} years, ${Math.round(p.heightCm)} cm (${Math.floor(p.heightCm / 2.54 / 12)} ft ${Math.round(p.heightCm / 2.54) % 12} in), ${p.weightKg.toFixed(1)} kg (${lb(p.weightKg).toFixed(1)} lb). Activity: ${act.label} (${act.hint}).`,
     `Goal: ${g.label} (id ${g.value}). Healthy pace for this goal: ${g.pace[0]} to ${g.pace[1]} kg a week.`,
+    `Strength training: ${(TRAINING.find((x) => x.value === trainingFor(p)) || TRAINING[0]).label}${p.training ? '' : ' (assumed, not answered yet)'}.${p.bodyFat ? ` Body fat: ${p.bodyFat}%.` : ''} Protein target basis: ${t.auto.protein.perKg} g per kg of ${t.auto.protein.kg.toFixed(1)} kg (${t.auto.protein.how === 'adjusted' ? 'adjusted for body fat using BMI' : t.auto.protein.how === 'bodyfat' ? 'from lean mass' : 'bodyweight'}).`,
     `Eating style today: ${styleFor(t.style).label} (id ${t.style}). Their Today screen puts ${macroLabel(focusFor(p, t), t).toLowerCase()} next to calories as ${directionOf(focusFor(p, t), p.goal, t) === 'max' ? 'a limit to stay under' : 'a target to reach'}, so treat that as their main number after calories.`,
     `Daily targets: ${t.kcal} kcal, ${t.protein} g protein, ${t.carbs} g ${t.netCarbs ? 'net carbs (maximum)' : 'carbs'}, ${t.fat} g fat, ${Math.round(t.water)} ml water.`,
     `How calories were set: resting burn ${t.auto.bmr} kcal × activity ${t.auto.factor} = ${t.auto.tdee} kcal maintenance, ${t.auto.delta >= 0 ? '+' : ''}${t.auto.delta} for the goal${t.auto.adjust ? `, ${t.auto.adjust > 0 ? '+' : ''}${t.auto.adjust} coach adjustment` : ''}.${ov.kcal || ov.protein ? ` The user overrode some targets by hand: ${JSON.stringify(Object.fromEntries(Object.entries(ov).filter(([, v]) => v)))}.` : ''}`,
