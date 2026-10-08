@@ -28,6 +28,8 @@ const ICONS = {
   info: html`<circle cx="12" cy="12" r="8.5" /><path d="M12 11v5M12 7.8v.2" />`,
   share: P('M12 15V4M8 7.5L12 3.5l4 4M6 11H5v9h14v-9h-1'),
   history: P('M4 12a8 8 0 1 0 2.3-5.6M4 4.5V8h3.5M12 8v4.5l3 2'),
+  scale: html`<rect x="4" y="4" width="16" height="16" rx="4.5" /><path d="M8.6 10.2a3.6 3.6 0 0 1 6.8 0M12 10.4l1.3-1.7" />`,
+  user: html`<circle cx="12" cy="8.5" r="3.6" /><path d="M5 19.5c1.3-3.5 4-5.1 7-5.1s5.7 1.6 7 5.1" />`,
 };
 
 export const Icon = ({ name, size = 22, stroke = 1.8 }) => html`

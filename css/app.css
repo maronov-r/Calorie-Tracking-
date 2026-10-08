@@ -20,6 +20,9 @@
   --fat: #6C899B;
   --water: #4F87B5;
   --water-soft: rgba(79, 135, 181, 0.16);
+  --chart-kcal: #0B8068;
+  --chart-protein: #C4683F;
+  --glow-protein: none;
   --good: #3B7A55;
   --mid: #C9962E;
   --low: #C0563F;
@@ -54,6 +57,9 @@
   --fat: #7CC4FF;
   --water: #5AB4FF;
   --water-soft: rgba(90, 180, 255, 0.16);
+  --chart-kcal: #2FA37E;
+  --chart-protein: #E2603F;
+  --glow-protein: drop-shadow(0 0 9px rgba(255, 140, 107, 0.45));
   --good: #C8F169;
   --mid: #FFC85C;
   --low: #FF7A66;
@@ -88,6 +94,9 @@
   --fat: #8B5CF6;
   --water: #1A9BFF;
   --water-soft: rgba(26, 155, 255, 0.14);
+  --chart-kcal: #2E5BFF;
+  --chart-protein: #E83F65;
+  --glow-protein: none;
   --good: #16A267;
   --mid: #F0A020;
   --low: #F2555A;
@@ -486,7 +495,7 @@ svg { flex-shrink: 0; }
   letter-spacing: var(--display-track);
   font-size: 50px;
   line-height: 1;
-  font-variant-numeric: lining-nums tabular-nums;
+  font-variant-numeric: lining-nums;
 }
 .ring-label { margin-top: 7px; font-size: 13.5px; color: var(--ink-2); }
 .hero-stats { display: flex; align-items: center; gap: 22px; margin: 4px 0 20px; }
@@ -496,6 +505,39 @@ svg { flex-shrink: 0; }
 .stat-div { width: 1px; height: 28px; background: var(--line); }
 
 .macros { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; width: 100%; }
+.macros.two { grid-template-columns: 1fr 1fr; gap: 18px; }
+
+/* Calories + protein rings */
+.duo { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; width: 100%; margin: 0 0 18px; }
+.duo-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 0;
+  border-radius: 18px;
+  transition: transform 0.12s;
+}
+.duo-item:active { transform: scale(0.97); }
+.duo .ring-num { font-size: 36px; }
+.ring-num small {
+  margin-left: 2px;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0;
+  color: var(--ink-2);
+}
+.duo .ring-label { margin-top: 5px; font-size: 12.5px; }
+.ring-check { display: flex; color: var(--protein); }
+.glow-protein .ring-progress { filter: var(--glow-protein); }
+.duo-cap { font-size: 13px; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+.duo-cap b { color: var(--ink); font-weight: 650; }
+
+.weigh-chip { gap: 6px; font-variant-numeric: tabular-nums; }
+.weigh-chip svg { color: var(--ink-2); }
+.weigh-chip.done svg { color: var(--accent); }
+.chip-accent { background: var(--accent); color: var(--accent-ink); gap: 6px; }
 .macro { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
 .macro-label { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--ink-2); font-weight: 500; }
 .macro-val { font-size: 12.5px; color: var(--ink-2); font-variant-numeric: tabular-nums; white-space: nowrap; }
@@ -592,9 +634,9 @@ svg { flex-shrink: 0; }
   max-width: 560px;
   z-index: 20;
   display: grid;
-  grid-template-columns: 1fr auto 1fr;
+  grid-template-columns: 1fr 1fr auto 1fr 1fr;
   align-items: center;
-  padding: 6px 36px calc(env(safe-area-inset-bottom) + 6px);
+  padding: 6px 8px calc(env(safe-area-inset-bottom) + 6px);
   background: var(--glass);
   -webkit-backdrop-filter: saturate(1.6) blur(18px);
   backdrop-filter: saturate(1.6) blur(18px);
@@ -758,7 +800,7 @@ svg { flex-shrink: 0; }
   letter-spacing: var(--display-track);
   font-size: 42px;
   line-height: 1.05;
-  font-variant-numeric: lining-nums tabular-nums;
+  font-variant-numeric: lining-nums;
 }
 .nsum-unit { color: var(--ink-2); font-size: 15px; }
 .nsum-macros { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 12px 0 18px; }
@@ -929,6 +971,132 @@ svg { flex-shrink: 0; }
 .contrib li { display: grid; grid-template-columns: minmax(0, 1fr) 84px 40px; align-items: center; gap: 10px; padding: 8px 0; }
 .contrib-name { font-size: 14.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .contrib-pct { text-align: right; font-size: 13px; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+
+/* ============ Charts ============ */
+
+.chart { position: relative; margin: 8px 0 6px; touch-action: pan-y; user-select: none; -webkit-user-select: none; }
+.chart svg { display: block; overflow: visible; }
+.chart .grid { stroke: var(--line); stroke-width: 1; }
+.chart .tick {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-size: 11px;
+  fill: var(--ink-3);
+  font-variant-numeric: tabular-nums;
+}
+.chart .tick.strong { fill: var(--ink); font-weight: 700; }
+.chart .goal-line { stroke: var(--ink-2); stroke-width: 1; opacity: 0.55; }
+.chart .goal-label { fill: var(--ink-2); font-weight: 600; }
+.wdot { fill: var(--chart-kcal); fill-opacity: 0.32; stroke: var(--surface); stroke-width: 2; }
+.wdot.hot { fill-opacity: 1; }
+.wline { fill: none; stroke: var(--chart-kcal); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.wend { fill: var(--chart-kcal); stroke: var(--surface); stroke-width: 2; }
+.crosshair { stroke: var(--ink-3); stroke-width: 1; }
+.col { transition: opacity 0.15s; }
+.col.hot { opacity: 0.75; }
+.chart-tip {
+  position: absolute;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 8px 11px;
+  border-radius: 12px;
+  background: var(--ink);
+  color: var(--bg);
+  font-size: 12px;
+  pointer-events: none;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.18);
+}
+.chart-tip b { font-size: 15px; font-weight: 700; }
+.chart-tip span { opacity: 0.72; }
+.chart-legend { display: flex; gap: 18px; padding-left: 38px; font-size: 12px; color: var(--ink-2); }
+.key-dot, .key-line { display: inline-block; margin-right: 6px; background: var(--chart-kcal); }
+.key-dot { width: 8px; height: 8px; border-radius: 50%; opacity: 0.4; vertical-align: 0; }
+.key-line { width: 14px; height: 2px; border-radius: 2px; vertical-align: 3px; }
+.chart-empty {
+  margin: 12px 0;
+  padding: 28px 16px;
+  border-radius: 16px;
+  background: var(--surface-2);
+  color: var(--ink-2);
+  font-size: 14px;
+  text-align: center;
+}
+
+/* ============ Profile ============ */
+
+.card-head .seg { min-width: 168px; }
+.weight-hero { display: flex; align-items: baseline; flex-wrap: wrap; gap: 6px 14px; }
+.weight-num {
+  font-family: var(--display);
+  font-weight: var(--display-weight);
+  letter-spacing: var(--display-track);
+  font-size: 46px;
+  line-height: 1;
+}
+.weight-num small {
+  margin-left: 6px;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-size: 16px;
+  font-weight: 500;
+  letter-spacing: 0;
+  color: var(--ink-2);
+}
+.weight-delta { font-size: 14.5px; font-weight: 650; }
+.weight-delta span { margin-left: 4px; font-weight: 400; color: var(--ink-2); }
+.weight-hero + .fine { margin-top: 6px; }
+.pace {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-top: 12px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: var(--surface-2);
+  font-size: 14px;
+  line-height: 1.45;
+}
+.pace .dot { margin-top: 6px; }
+.hits { display: flex; align-items: center; gap: 10px; margin: 8px 0 14px; font-size: 14px; }
+.hits-label { flex: 1; color: var(--ink-2); }
+.hits b { font-weight: 650; font-variant-numeric: tabular-nums; }
+.hit-dots { display: flex; gap: 5px; }
+.hit-dots i { width: 12px; height: 12px; border-radius: 50%; background: var(--track); }
+.hit-dots i.on { background: var(--chart-protein); }
+.hit-dots i.miss { background: transparent; box-shadow: inset 0 0 0 2px var(--chart-protein); opacity: 0.5; }
+.stat-box-sub { font-size: 12.5px; color: var(--ink-3); }
+.stat-pair + .fine { margin-top: 10px; }
+.micro-score { font-size: 15px; margin-bottom: 10px; }
+.micro-score + .bar { margin-bottom: 14px; }
+.plan-list > div { display: flex; justify-content: space-between; gap: 12px; padding: 10px 0; font-size: 15px; }
+.plan-list > div + div { border-top: 1px solid var(--line); }
+.plan-list span { color: var(--ink-2); }
+.plan-list b { font-weight: 600; text-align: right; }
+
+.weigh { padding-top: 10px; }
+.weigh-row { display: flex; align-items: center; justify-content: center; gap: 14px; margin: 8px 0 14px; }
+.weigh-step {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--surface-2);
+  transition: transform 0.12s;
+}
+.weigh-step:active { transform: scale(0.92); }
+.weigh-input { width: 180px; }
+.weigh-input .num-wrap { height: 74px; border-radius: 20px; justify-content: center; padding: 0 16px; }
+.weigh-input input {
+  width: 100%;
+  font-family: var(--display);
+  font-weight: var(--display-weight);
+  letter-spacing: var(--display-track);
+  font-size: 38px;
+  text-align: center;
+}
+.weigh-input .num-suffix { font-size: 16px; }
 
 /* ============ Settings ============ */
 

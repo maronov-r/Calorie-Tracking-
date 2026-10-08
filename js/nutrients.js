@@ -64,13 +64,18 @@ export const ACTIVITY = [
   { value: 'athlete', label: 'Athlete', hint: 'Physical job or training twice a day', factor: 1.9 },
 ];
 
+// delta: daily calories vs. maintenance. protein: g per kg of bodyweight.
+// pace: healthy weekly weight change in kg [low, high], used to coach from the weight trend.
 export const GOALS = [
-  { value: 'lose1', delta: -500, us: 'Lose 1 lb a week', metric: 'Lose 0.5 kg a week' },
-  { value: 'lose05', delta: -250, us: 'Lose ½ lb a week', metric: 'Lose 0.25 kg a week' },
-  { value: 'maintain', delta: 0, us: 'Maintain weight', metric: 'Maintain weight' },
-  { value: 'gain05', delta: 250, us: 'Gain ½ lb a week', metric: 'Gain 0.25 kg a week' },
-  { value: 'gain1', delta: 500, us: 'Gain 1 lb a week', metric: 'Gain 0.5 kg a week' },
+  { value: 'cut', label: 'Lose fat', hint: 'About 1 lb (0.5 kg) a week', delta: -500, protein: 2.0, pace: [-0.7, -0.25] },
+  { value: 'cut_slow', label: 'Lose fat slowly', hint: 'About ½ lb a week, easier to keep muscle', delta: -250, protein: 2.0, pace: [-0.4, -0.08] },
+  { value: 'maintain', label: 'Maintain', hint: 'Stay at your weight and get stronger', delta: 0, protein: 1.6, pace: [-0.15, 0.15] },
+  { value: 'lean_bulk', label: 'Build muscle', hint: 'Lean bulk: small surplus, high protein', delta: 300, protein: 2.0, pace: [0.1, 0.25] },
+  { value: 'bulk', label: 'Bulk', hint: 'Faster gain, with some fat along the way', delta: 500, protein: 1.8, pace: [0.2, 0.5] },
 ];
+const LEGACY_GOALS = { lose1: 'cut', lose05: 'cut_slow', gain05: 'lean_bulk', gain1: 'bulk' };
+export const goalFor = (value) => GOALS.find((g) => g.value === (LEGACY_GOALS[value] || value)) || GOALS[2];
+export const isGaining = (value) => goalFor(value).delta > 0;
 
 const round = (v, step = 1) => Math.round(v / step) * step;
 
@@ -78,13 +83,13 @@ export function computeTargets(profile, overrides = {}) {
   const { sex = 'female', age = 30, heightCm = 170, weightKg = 70, activity = 'light', goal = 'maintain' } = profile || {};
   const bmr = 10 * weightKg + 6.25 * heightCm - 5 * age + (sex === 'male' ? 5 : -161);
   const factor = (ACTIVITY.find((a) => a.value === activity) || ACTIVITY[1]).factor;
-  const delta = (GOALS.find((g) => g.value === goal) || GOALS[2]).delta;
+  const g = goalFor(goal);
   const floor = sex === 'male' ? 1500 : 1200;
-  const autoKcal = Math.max(floor, round(bmr * factor + delta, 10));
+  const autoKcal = Math.max(floor, round(bmr * factor + g.delta, 10));
   const kcal = overrides.kcal || autoKcal;
 
-  const proteinPerKg = goal === 'maintain' ? 1.3 : 1.6;
-  const protein = overrides.protein || round(Math.min(weightKg, 120) * proteinPerKg);
+  // Capped so very heavy bodies don't get an unreachable protein target.
+  const protein = overrides.protein || round(Math.min(weightKg, 120) * g.protein);
   const fat = overrides.fat || round((kcal * 0.3) / 9);
   const carbs = overrides.carbs || Math.max(50, round((kcal - protein * 4 - fat * 9) / 4));
   const water = overrides.water || Math.min(4000, Math.max(2000, round(weightKg * 35, 250)));
@@ -170,6 +175,12 @@ export function fmtQty(q) {
   if (map[frac]) return (whole ? whole : '') + map[frac];
   return String(+q.toFixed(2));
 }
+
+export const KG_PER_LB = 0.45359237;
+export const weightUnit = (units) => (units === 'metric' ? 'kg' : 'lb');
+export const kgToDisplay = (kg, units) => (units === 'metric' ? kg : kg / KG_PER_LB);
+export const displayToKg = (v, units) => (units === 'metric' ? v : v * KG_PER_LB);
+export const fmtWeight = (kg, units) => `${kgToDisplay(kg, units).toFixed(1)} ${weightUnit(units)}`;
 
 export const ML_PER_OZ = 29.5735;
 export const fmtWater = (ml, units) => (units === 'metric' ? `${+(ml / 1000).toFixed(2)} L` : `${Math.round(ml / ML_PER_OZ)} oz`);

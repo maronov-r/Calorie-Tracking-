@@ -1,5 +1,5 @@
 // Offline support: serve the app from cache, refresh it in the background.
-const CACHE = 'plate-v1';
+const CACHE = 'plate-v2';
 const SHELL = [
   './',
   './index.html',
@@ -12,11 +12,14 @@ const SHELL = [
   './js/off.js',
   './js/ai.js',
   './js/ui.js',
+  './js/weight.js',
+  './js/charts.js',
   './js/lib/db.js',
   './js/views/today.js',
   './js/views/add.js',
   './js/views/scan.js',
   './js/views/nutrients.js',
+  './js/views/profile.js',
   './js/views/settings.js',
   './js/views/onboarding.js',
   './js/vendor/preact.js',

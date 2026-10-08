@@ -1,5 +1,5 @@
 import { html, useState } from '../vendor/preact.js';
-import { setProfile, setSettings } from '../store.js';
+import { setProfile, setSettings, setWeight, dateKey as todayKey } from '../store.js';
 import { Icon, Ring, Segmented } from '../ui.js';
 import { ACTIVITY, GOALS, MICROS, ML_PER_OZ, computeTargets, fmtKcal } from '../nutrients.js';
 import { ProfileFields, ChoiceList } from './settings.js';
@@ -15,6 +15,7 @@ export function Onboarding() {
   const finish = () => {
     setSettings({ units });
     setProfile(p);
+    setWeight(todayKey(), p.weightKg); // first point on the weight trend
   };
 
   // Plain helpers (not components) so the buttons keep their DOM nodes between renders.
@@ -69,7 +70,7 @@ export function Onboarding() {
         ${dots()}
         <h1 class="ob-h">What's your goal?</h1>
         <p class="ob-sub">You can change this any time in Settings.</p>
-        <${ChoiceList} options=${GOALS.map((g) => ({ value: g.value, label: g[units] }))} value=${p.goal} onChange=${(v) => upd({ goal: v })} />
+        <${ChoiceList} options=${GOALS.map((g) => ({ value: g.value, label: g.label, hint: g.hint }))} value=${p.goal} onChange=${(v) => upd({ goal: v })} />
         ${nav(() => setStep(4))}
       </div>`;
   }

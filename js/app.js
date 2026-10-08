@@ -5,13 +5,21 @@ import { loadFoods } from './foods.js';
 import { Today, EntrySheet } from './views/today.js';
 import { AddSheet } from './views/add.js';
 import { NutrientsView, NutrientSheet } from './views/nutrients.js';
+import { ProfileView, WeighInSheet } from './views/profile.js';
 import { SettingsView } from './views/settings.js';
 import { Onboarding } from './views/onboarding.js';
+
+const TABS = [
+  { value: 'today', label: 'Today', icon: 'ring' },
+  { value: 'nutrients', label: 'Nutrients', icon: 'leaf' },
+  null, // the add button sits in the middle
+  { value: 'profile', label: 'Profile', icon: 'user' },
+  { value: 'settings', label: 'Settings', icon: 'sliders' },
+];
 
 function App() {
   const s = useStore();
   const [tab, setTab] = useState('today');
-  const [lastTab, setLastTab] = useState('today');
   const [day, setDay] = useState(todayKey());
   const [sheet, setSheet] = useState(null);
   const [section, setSection] = useState(null);
@@ -37,11 +45,7 @@ function App() {
   if (!s.profile) return html`<${Onboarding} />`;
 
   const go = (next, toSection = null) => {
-    if (next === 'back') setTab(lastTab);
-    else {
-      if (tab !== 'settings') setLastTab(tab);
-      setTab(next);
-    }
+    setTab(next);
     setSection(toSection);
     window.scrollTo(0, 0);
   };
@@ -51,26 +55,25 @@ function App() {
     <main class="app">
       ${tab === 'today' && html`<${Today} dateKey=${day} setDateKey=${setDay} openSheet=${setSheet} go=${go} />`}
       ${tab === 'nutrients' && html`<${NutrientsView} dateKey=${day} openSheet=${setSheet} go=${go} />`}
+      ${tab === 'profile' && html`<${ProfileView} openSheet=${setSheet} go=${go} />`}
       ${tab === 'settings' && html`<${SettingsView} go=${go} section=${section} />`}
     </main>
 
-    ${tab !== 'settings' && html`
-      <nav class="tabbar" aria-label="Main">
-        <button type="button" class="tab ${tab === 'today' ? 'on' : ''}" onClick=${() => go('today')} aria-current=${tab === 'today' ? 'page' : null}>
-          <${Icon} name="ring" size=${24} /><span>Today</span>
-        </button>
-        <button type="button" class="tab-add" onClick=${() => setSheet({ type: 'add' })} aria-label="Add food">
-          <${Icon} name="plus" size=${28} stroke=${2.2} />
-        </button>
-        <button type="button" class="tab ${tab === 'nutrients' ? 'on' : ''}" onClick=${() => go('nutrients')} aria-current=${tab === 'nutrients' ? 'page' : null}>
-          <${Icon} name="leaf" size=${24} /><span>Nutrients</span>
-        </button>
-      </nav>`}
+    <nav class="tabbar" aria-label="Main">
+      ${TABS.map((t) => (t
+        ? html`<button type="button" class="tab ${tab === t.value ? 'on' : ''}" onClick=${() => go(t.value)} aria-current=${tab === t.value ? 'page' : null}>
+            <${Icon} name=${t.icon} size=${23} /><span>${t.label}</span>
+          </button>`
+        : html`<button type="button" class="tab-add" onClick=${() => setSheet({ type: 'add' })} aria-label="Add food">
+            <${Icon} name="plus" size=${28} stroke=${2.2} />
+          </button>`))}
+    </nav>
 
     ${sheet?.type === 'add' && html`
       <${AddSheet} key=${sheet.query || 'add'} dateKey=${day} meal=${sheet.meal} mode=${sheet.mode} query=${sheet.query}
         onClose=${closeSheet(sheet)} toSettings=${() => { setSheet(null); go('settings', 'ai'); }} />`}
     ${sheet?.type === 'entry' && html`<${EntrySheet} dateKey=${day} id=${sheet.id} onClose=${closeSheet(sheet)} />`}
+    ${sheet?.type === 'weigh' && html`<${WeighInSheet} onClose=${closeSheet(sheet)} />`}
     ${sheet?.type === 'nutrient' && html`
       <${NutrientSheet} nkey=${sheet.key} dateKey=${day} onClose=${closeSheet(sheet)}
         onSearch=${(q) => setSheet({ type: 'add', mode: 'search', query: q })} />`}

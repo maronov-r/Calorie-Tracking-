@@ -12,14 +12,15 @@ A calm, private calorie tracker for your phone. It tracks calories, macros, wate
 
 ## What it does
 
-- **Today:** a calorie ring, protein/carbs/fat bars, tap-a-drop water tracking, and a grid of vitamin and mineral rings.
+- **Today:** calorie and protein rings side by side, carb and fat bars, tap-a-drop water tracking, a grid of vitamin and mineral rings, and a small weigh-in button.
+- **Profile:** your weight trend (smoothed over 7 days) with a weekly rate and coaching for your goal, 14 days of protein or calories against your goal, how many days you hit protein, and how your vitamins are doing.
 - **Three ways to log food:**
   - **Search** about 7,800 everyday foods from the USDA with full vitamin and mineral data. It works offline.
   - **Scan** a barcode on packaged food (via Open Food Facts).
   - **Describe** a meal in words or snap a photo, and Claude estimates it (needs your own API key, see below).
 - **Nutrients:** see today or a 7-day average against the U.S. Recommended Dietary Allowances for your age and sex. Tap any nutrient to see where yours came from and which foods are good sources.
 - **Supplements:** add what you take once, then tick it off each day. It counts toward your totals.
-- **Targets** are calculated from your age, sex, height, weight, activity level and goal (Mifflin–St Jeor). You can override any of them.
+- **Goals:** Lose fat, Lose fat slowly, Maintain, Build muscle (lean bulk, +300 kcal, about 0.9 g protein per lb) or Bulk. Targets are calculated from your age, sex, height, weight and activity level (Mifflin–St Jeor), follow your latest weigh-in, and can be overridden.
 - **Themes:** Oat (default), Midnight and Porcelain. Change them in Settings.
 
 ## AI logging (optional)
@@ -49,6 +50,7 @@ js/app.js                                 tabs, sheets, startup
 js/store.js                               state + IndexedDB persistence
 js/nutrients.js                           nutrient list, RDAs, targets, formatting
 js/foods.js                               local food search
+js/weight.js, js/charts.js                weight trend math and SVG charts
 js/off.js                                 Open Food Facts barcode lookup
 js/ai.js                                  Claude meal estimates
 js/views/*                                screens

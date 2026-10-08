@@ -1,23 +1,26 @@
 import { html, useState, useRef, useEffect } from '../vendor/preact.js';
 import {
-  useStore, setProfile, setSettings, getTargets, THEMES, saveSupplement, deleteSupplement, exportData, importData, eraseAll, toast,
+  useStore, state, setProfile, setSettings, setWeight, getTargets, THEMES, saveSupplement, deleteSupplement,
+  exportData, importData, eraseAll, toast, dateKey as todayKey,
 } from '../store.js';
 import { Icon, Segmented, NumberInput, Sheet } from '../ui.js';
-import { ACTIVITY, GOALS, ML_PER_OZ, MICROS, N, SUPP_PRESETS, fmtNum, computeTargets } from '../nutrients.js';
+import { ACTIVITY, GOALS, ML_PER_OZ, MICROS, N, SUPP_PRESETS, fmtNum, computeTargets, KG_PER_LB } from '../nutrients.js';
 import { AI_MODELS } from '../ai.js';
 
-const KG_PER_LB = 0.45359237;
 
 // Profile inputs, shared by onboarding and settings. Calls onChange only with valid values.
 export function ProfileFields({ profile, onChange, units }) {
   const p = profile;
   const totalIn = p.heightCm ? p.heightCm / 2.54 : 0;
-  const [ft, setFt] = useState(totalIn ? Math.floor(Math.round(totalIn) / 12) : '');
-  const [inch, setInch] = useState(totalIn ? Math.round(totalIn) % 12 : '');
-  const setHeightUS = (f, i) => {
-    setFt(f); setInch(i);
-    const total = (+f || 0) * 12 + (+i || 0);
-    if (f > 0 && total > 36) onChange({ heightCm: +(total * 2.54).toFixed(1) });
+  // Feet and inches live in a ref so two quick edits never combine stale values.
+  const h = useRef({ ft: totalIn ? Math.floor(Math.round(totalIn) / 12) : '', inch: totalIn ? Math.round(totalIn) % 12 : '' });
+  const [, rerender] = useState(0);
+  const { ft, inch } = h.current;
+  const setHeightUS = (patch) => {
+    h.current = { ...h.current, ...patch };
+    rerender((n) => n + 1);
+    const total = (+h.current.ft || 0) * 12 + (+h.current.inch || 0);
+    if (h.current.ft > 0 && total > 36) onChange({ heightCm: +(total * 2.54).toFixed(1) });
   };
   const lb = p.weightKg ? +(p.weightKg / KG_PER_LB).toFixed(1) : '';
 
@@ -41,8 +44,8 @@ export function ProfileFields({ profile, onChange, units }) {
             onChange=${(v) => v >= 100 && v <= 250 && onChange({ heightCm: v })} />`
         : html`
           <div class="field-row">
-            <${NumberInput} className="field" label="Height" value=${ft} suffix="ft" onChange=${(v) => setHeightUS(v, inch)} />
-            <${NumberInput} className="field" label=" " value=${inch} suffix="in" onChange=${(v) => setHeightUS(ft, v)} />
+            <${NumberInput} className="field" label="Height" value=${ft} suffix="ft" onChange=${(v) => setHeightUS({ ft: v })} />
+            <${NumberInput} className="field" label=" " value=${inch} suffix="in" onChange=${(v) => setHeightUS({ inch: v })} />
           </div>`}
     </div>`;
 }
@@ -70,7 +73,11 @@ export function SettingsView({ go, section }) {
   const [showKey, setShowKey] = useState(false);
   const importRef = useRef();
 
-  const upd = (patch) => setProfile({ ...p, ...patch });
+  // A weight typed here counts as today's weigh-in, so the trend and targets stay in sync.
+  const upd = ({ weightKg, ...patch }) => {
+    if (weightKg) setWeight(todayKey(), weightKg);
+    if (Object.keys(patch).length) setProfile({ ...state.profile, ...patch });
+  };
   const setOv = (k, v) => setSettings({ overrides: { ...ov, [k]: v > 0 ? v : undefined } });
   // What each target would be without its own override (carbs and fat follow the calorie/protein targets).
   const auto = computeTargets(p, {});
@@ -106,9 +113,7 @@ export function SettingsView({ go, section }) {
 
   return html`
     <header class="page-head">
-      <button type="button" class="icon-btn" onClick=${() => go('back')} aria-label="Back"><${Icon} name="back" /></button>
-      <h1 class="title title-sm">Settings</h1>
-      <span class="icon-btn-spacer" />
+      <h1 class="title">Settings</h1>
     </header>
 
     <section class="card set-section">
@@ -141,7 +146,7 @@ export function SettingsView({ go, section }) {
       <div class="field">
         <span class="field-label">Goal</span>
         <select class="select" value=${p.goal} onChange=${(e) => upd({ goal: e.currentTarget.value })}>
-          ${GOALS.map((g) => html`<option value=${g.value}>${g[units === 'metric' ? 'metric' : 'us']}</option>`)}
+          ${GOALS.map((g) => html`<option value=${g.value}>${g.label} · ${g.hint}</option>`)}
         </select>
       </div>
     </section>

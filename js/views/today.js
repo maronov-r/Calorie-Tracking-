@@ -1,10 +1,12 @@
 import { html, useState, useEffect } from '../vendor/preact.js';
 import {
   useStore, getDay, getTargets, totalsFor, weekAverage, MEALS, setWater, toggleSupp, setSettings,
-  dateKey as todayKey, shiftKey, parseKey, updateEntry, removeEntry, addEntries, toast,
+  dateKey as todayKey, shiftKey, parseKey, updateEntry, removeEntry, addEntries, toast, latestWeighIn,
 } from '../store.js';
 import { Ring, Bar, Icon, Stepper, Segmented, Sheet, NutritionSummary, statusColor } from '../ui.js';
-import { fmtKcal, fmtWater, ML_PER_OZ, MICROS, VITAMINS, MINERALS, status, fmtQty, scale } from '../nutrients.js';
+import {
+  fmtKcal, fmtWater, fmtWeight, ML_PER_OZ, MICROS, VITAMINS, MINERALS, status, fmtQty, scale, isGaining,
+} from '../nutrients.js';
 import { describeAmount } from '../foods.js';
 
 const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -33,6 +35,7 @@ export function Today({ dateKey, setDateKey, openSheet, go }) {
   const totals = totalsFor(dateKey);
   const week = weekAverage(dateKey);
   const today = todayKey();
+  const latest = latestWeighIn();
 
   return html`
     <header class="page-head">
@@ -41,8 +44,13 @@ export function Today({ dateKey, setDateKey, openSheet, go }) {
         <p class="subtitle">${dateLine(dateKey)}</p>
       </div>
       <div class="head-actions">
-        ${dateKey !== today && html`<button type="button" class="chip" onClick=${() => setDateKey(today)}>Today</button>`}
-        <button type="button" class="icon-btn" onClick=${() => go('settings')} aria-label="Settings"><${Icon} name="sliders" /></button>
+        ${dateKey !== today
+          ? html`<button type="button" class="chip" onClick=${() => setDateKey(today)}>Back to today</button>`
+          : html`<button type="button" class="chip weigh-chip ${latest?.key === today ? 'done' : ''}" onClick=${() => openSheet({ type: 'weigh' })}
+              aria-label=${latest ? `Weigh in. Last: ${fmtWeight(latest.kg, s.settings.units)}` : 'Weigh in'}>
+              <${Icon} name=${latest?.key === today ? 'check' : 'scale'} size=${16} stroke=${latest?.key === today ? 2.4 : 1.8} />
+              ${latest ? fmtWeight(latest.kg, s.settings.units) : 'Weigh in'}
+            </button>`}
       </div>
     </header>
 
@@ -55,7 +63,7 @@ export function Today({ dateKey, setDateKey, openSheet, go }) {
         <button type="button" class="icon-btn sm" onClick=${() => setSettings({ hideInstallHint: true })} aria-label="Dismiss"><${Icon} name="close" size=${16} /></button>
       </div>`}
 
-    <${CalorieCard} totals=${totals} t=${t} />
+    <${CalorieCard} totals=${totals} t=${t} gaining=${isGaining(s.profile.goal)} openNutrient=${(key) => openSheet({ type: 'nutrient', key })} />
     <${WaterCard} dateKey=${dateKey} ml=${day.water || 0} goal=${t.water} units=${s.settings.units} />
     <${MicroCard} totals=${totals} t=${t} week=${week} hasFood=${day.entries.length > 0}
       openNutrient=${(key) => openSheet({ type: 'nutrient', key })} go=${go} />
@@ -91,26 +99,36 @@ function WeekStrip({ dateKey, setDateKey, today, goal }) {
     </div>`;
 }
 
-const MACRO_ROWS = [['protein', 'Protein'], ['carbs', 'Carbs'], ['fat', 'Fat']];
+const MACRO_ROWS = [['carbs', 'Carbs'], ['fat', 'Fat']];
 
-function CalorieCard({ totals, t }) {
+// Calories and protein side by side: the two numbers that matter most for building muscle.
+function CalorieCard({ totals, t, gaining, openNutrient }) {
   const eaten = totals.kcal || 0;
   const left = t.kcal - eaten;
   const over = left < 0;
+  const protein = totals.protein || 0;
+  const proteinLeft = t.protein - protein;
+  const proteinHit = proteinLeft <= 0;
   return html`
     <section class="card hero">
-      <div class="hero-ring">
-        <${Ring} value=${eaten} max=${t.kcal} size=${212} stroke=${13} color=${over ? 'var(--over)' : 'var(--accent)'} className="glow">
-          <span class="ring-num">${fmtKcal(Math.abs(left))}</span>
-          <span class="ring-label">${over ? 'kcal over' : 'kcal left'}</span>
-        <//>
+      <div class="duo">
+        <button type="button" class="duo-item" onClick=${() => openNutrient('kcal')}>
+          <${Ring} value=${eaten} max=${t.kcal} size=${148} stroke=${12} color=${over ? 'var(--over)' : 'var(--accent)'} className="glow">
+            <span class="ring-num">${fmtKcal(Math.abs(left))}</span>
+            <span class="ring-label">${over ? 'kcal over' : gaining ? 'kcal to go' : 'kcal left'}</span>
+          <//>
+          <span class="duo-cap"><b>${fmtKcal(eaten)}</b> / ${fmtKcal(t.kcal)} kcal</span>
+        </button>
+        <button type="button" class="duo-item" onClick=${() => openNutrient('protein')}>
+          <${Ring} value=${protein} max=${t.protein} size=${148} stroke=${12} color="var(--protein)" className="glow-protein">
+            ${proteinHit
+              ? html`<span class="ring-check"><${Icon} name="check" size=${30} stroke=${2.6} /></span><span class="ring-label">protein hit</span>`
+              : html`<span class="ring-num">${Math.ceil(proteinLeft)}<small>g</small></span><span class="ring-label">protein to go</span>`}
+          <//>
+          <span class="duo-cap"><b>${Math.round(protein)}</b> / ${t.protein} g protein</span>
+        </button>
       </div>
-      <div class="hero-stats">
-        <div><span class="stat-num">${fmtKcal(eaten)}</span><span class="stat-label">eaten</span></div>
-        <span class="stat-div" />
-        <div><span class="stat-num">${fmtKcal(t.kcal)}</span><span class="stat-label">goal</span></div>
-      </div>
-      <div class="macros">
+      <div class="macros two">
         ${MACRO_ROWS.map(([k, label]) => html`
           <div class="macro">
             <span class="macro-label"><i class="dot" style=${{ background: `var(--${k})` }} />${label}</span>

@@ -26,7 +26,6 @@ export function NutrientsView({ dateKey, openSheet, go }) {
         <h1 class="title">Nutrients</h1>
         <p class="subtitle">${subtitle}</p>
       </div>
-      <button type="button" class="icon-btn" onClick=${() => go('settings')} aria-label="Settings"><${Icon} name="sliders" /></button>
     </header>
 
     <${Segmented} className="range-seg" options=${[{ value: 'day', label: dayTitle(dateKey) }, { value: 'week', label: '7-day average' }]} value=${range} onChange=${setRange} />

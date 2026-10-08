@@ -1,0 +1,213 @@
+import { html, useState } from '../vendor/preact.js';
+import {
+  useStore, getTargets, getDay, totalsFor, weekAverage, weighIns, latestWeighIn, setWeight, toast,
+  dateKey as todayKey, shiftKey, parseKey,
+} from '../store.js';
+import { Icon, Bar, Segmented, Sheet, NumberInput, Empty, statusColor } from '../ui.js';
+import {
+  goalFor, ACTIVITY, MICROS, fmtKcal, fmtWeight, fmtWater, kgToDisplay, displayToKg, weightUnit, KG_PER_LB,
+} from '../nutrients.js';
+import { withTrend, weeklyRate, paceAdvice, fmtRate } from '../weight.js';
+import { WeightChart, IntakeChart } from '../charts.js';
+
+const RANGES = [{ value: '30', label: '30 days' }, { value: '90', label: '90 days' }, { value: 'all', label: 'All' }];
+const lastDays = (n, end) => Array.from({ length: n }, (_, i) => shiftKey(end, i - n + 1));
+
+function relativeDay(key) {
+  const today = todayKey();
+  if (key === today) return 'today';
+  if (key === shiftKey(today, -1)) return 'yesterday';
+  return `on ${parseKey(key).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`;
+}
+
+function loggedStreak(today) {
+  let k = getDay(today).entries.length ? today : shiftKey(today, -1);
+  let n = 0;
+  while (getDay(k).entries.length) { n++; k = shiftKey(k, -1); }
+  return n;
+}
+
+function heightLabel(cm, units) {
+  if (units === 'metric') return `${Math.round(cm)} cm`;
+  const total = Math.round(cm / 2.54);
+  return `${Math.floor(total / 12)}′${total % 12}″`;
+}
+
+export function ProfileView({ openSheet, go }) {
+  const s = useStore();
+  const p = s.profile;
+  const units = s.settings.units;
+  const unit = weightUnit(units);
+  const t = getTargets();
+  const g = goalFor(p.goal);
+  const today = todayKey();
+  const [range, setRange] = useState('30');
+  const [metric, setMetric] = useState('protein');
+
+  // ---- Weight ----
+  const all = withTrend(weighIns());
+  const latest = all[all.length - 1];
+  const from = range === 'all' ? (all[0]?.key || today) : shiftKey(today, -(+range - 1));
+  const shown = all.filter((w) => w.key >= from);
+  const change = shown.length >= 2 ? shown[shown.length - 1].trend - shown[0].trend : null;
+  const changeDisp = change == null ? 0 : units === 'metric' ? change : change / KG_PER_LB;
+  const rate = weeklyRate(all, today);
+  const advice = paceAdvice(rate, p.goal);
+
+  // ---- Eating ----
+  const days = lastDays(14, today).map((k) => {
+    const tot = totalsFor(k);
+    return { key: k, logged: getDay(k).entries.length > 0, value: (metric === 'kcal' ? tot.kcal : tot.protein) || 0 };
+  });
+  const week = weekAverage(today);
+  const hits = lastDays(7, today).map((k) => ({ key: k, logged: getDay(k).entries.length > 0, hit: (totalsFor(k).protein || 0) >= t.protein }));
+  const hitCount = hits.filter((h) => h.hit).length;
+  const streak = loggedStreak(today);
+
+  // ---- Vitamins ----
+  const microTotals = week.count ? week.totals : totalsFor(today);
+  const met = MICROS.filter((n) => (microTotals[n.key] || 0) >= t[n.key]).length;
+  const lowest = MICROS.map((n) => ({ n, pct: (microTotals[n.key] || 0) / t[n.key] })).sort((a, b) => a.pct - b.pct).slice(0, 3);
+  const anyFood = week.count > 0 || getDay(today).entries.length > 0;
+
+  return html`
+    <header class="page-head">
+      <div>
+        <h1 class="title">Profile</h1>
+        <p class="subtitle">${g.label} · ${p.age} · ${heightLabel(p.heightCm, units)}</p>
+      </div>
+    </header>
+
+    <section class="card">
+      <div class="card-head">
+        <h2 class="card-title">Weight</h2>
+        <button type="button" class="chip chip-accent" onClick=${() => openSheet({ type: 'weigh' })}><${Icon} name="scale" size=${16} /> Weigh in</button>
+      </div>
+      ${latest ? html`
+        <div class="weight-hero">
+          <span class="weight-num">${kgToDisplay(latest.kg, units).toFixed(1)}<small>${unit}</small></span>
+          ${change != null && Math.abs(changeDisp) >= 0.05 && html`
+            <span class="weight-delta">${changeDisp > 0 ? '↑' : '↓'} ${Math.abs(changeDisp).toFixed(1)} ${unit}
+              <span>${range === 'all' ? 'overall' : `in ${range} days`}</span></span>`}
+        </div>
+        <p class="fine">Last weigh-in ${relativeDay(latest.key)}</p>
+        ${shown.length >= 2
+          ? html`<${WeightChart} points=${shown} from=${range === 'all' ? shown[0].key : from} to=${today} units=${units} />`
+          : html`<p class="chart-empty">Weigh in a few times a week and your trend line shows up here.</p>`}
+        <${Segmented} className="seg-sm" options=${RANGES} value=${range} onChange=${setRange} />
+        ${advice
+          ? html`<div class="pace"><i class="dot" style=${{ background: statusColor(advice.tone === 'good' ? 'good' : 'mid') }} />
+              <p><b>${fmtRate(rate, units)}</b> · ${advice.text}</p></div>`
+          : html`<p class="fine">After about two weeks of weigh-ins, you'll see your weekly rate and whether it fits your goal.</p>`}
+      ` : html`
+        <${Empty} icon="scale" title="No weigh-ins yet">
+          Weigh in first thing in the morning a few times a week. Plate smooths out the daily ups and downs into a trend.
+        <//>`}
+    </section>
+
+    <section class="card">
+      <div class="card-head">
+        <h2 class="card-title">Eating</h2>
+        <${Segmented} className="seg-sm" options=${[{ value: 'protein', label: 'Protein' }, { value: 'kcal', label: 'Calories' }]} value=${metric} onChange=${setMetric} />
+      </div>
+      <${IntakeChart} days=${days} goal=${metric === 'kcal' ? t.kcal : t.protein} unit=${metric === 'kcal' ? 'kcal' : 'g'}
+        color=${metric === 'kcal' ? 'var(--chart-kcal)' : 'var(--chart-protein)'} todayKey=${today} />
+      <div class="hits">
+        <span class="hits-label">Protein goal hit</span>
+        <span class="hit-dots">
+          ${hits.map((h) => html`<i class=${h.hit ? 'on' : h.logged ? 'miss' : ''} title=${h.key} />`)}
+        </span>
+        <b>${hitCount} of 7 days</b>
+      </div>
+      <div class="stat-pair">
+        <div class="stat-box">
+          <span class="stat-box-label">Avg calories</span>
+          <span class="stat-box-num">${week.count ? fmtKcal(week.totals.kcal) : '–'}</span>
+          <span class="stat-box-sub">goal ${fmtKcal(t.kcal)}</span>
+        </div>
+        <div class="stat-box">
+          <span class="stat-box-label">Avg protein</span>
+          <span class="stat-box-num">${week.count ? `${Math.round(week.totals.protein || 0)} g` : '–'}</span>
+          <span class="stat-box-sub">goal ${t.protein} g</span>
+        </div>
+      </div>
+      <p class="fine">${week.count ? `Averages of your last ${week.count} logged day${week.count > 1 ? 's' : ''}, not counting today.` : 'Averages appear after your first full day.'}
+        ${streak > 1 ? ` ${streak}-day logging streak.` : ''}</p>
+    </section>
+
+    <section class="card">
+      <div class="card-head">
+        <h2 class="card-title">Vitamins & minerals</h2>
+        <button type="button" class="link" onClick=${() => go('nutrients')}>Details</button>
+      </div>
+      ${anyFood ? html`
+        <p class="micro-score"><b>${met} of ${MICROS.length}</b> daily targets met ${week.count ? 'on average this week' : 'so far today'}</p>
+        <${Bar} value=${met} max=${MICROS.length} />
+        <p class="low-label">Lowest</p>
+        <div class="chips">
+          ${lowest.map((x) => html`<button type="button" class="chip" onClick=${() => openSheet({ type: 'nutrient', key: x.n.key })}>
+            ${x.n.name.replace(/ \(.+\)/, '')} <b style=${{ color: statusColor(x.pct < 0.5 ? 'low' : x.pct < 1 ? 'mid' : 'good') }}>${Math.round(x.pct * 100)}%</b></button>`)}
+        </div>`
+      : html`<p class="fine">Log some food to see how your vitamins and minerals are doing.</p>`}
+    </section>
+
+    <section class="card">
+      <div class="card-head">
+        <h2 class="card-title">Your plan</h2>
+        <button type="button" class="link" onClick=${() => go('settings')}>Edit</button>
+      </div>
+      <div class="plan-list">
+        <div><span>Goal</span><b>${g.label}</b></div>
+        <div><span>Calories</span><b>${fmtKcal(t.kcal)} kcal</b></div>
+        <div><span>Protein</span><b>${t.protein} g</b></div>
+        <div><span>Carbs · Fat</span><b>${t.carbs} g · ${t.fat} g</b></div>
+        <div><span>Water</span><b>${fmtWater(t.water, units)}</b></div>
+        <div><span>Activity</span><b>${(ACTIVITY.find((a) => a.value === p.activity) || ACTIVITY[1]).label}</b></div>
+      </div>
+    </section>
+  `;
+}
+
+// ---- Quick weigh-in ----
+
+export function WeighInSheet({ onClose }) {
+  return html`<${Sheet} onClose=${onClose} label="Weigh in" render=${(close) => html`<${WeighIn} close=${close} />`} />`;
+}
+
+function WeighIn({ close }) {
+  const s = useStore();
+  const units = s.settings.units;
+  const unit = weightUnit(units);
+  const today = todayKey();
+  const latest = latestWeighIn();
+  const start = kgToDisplay(latest ? latest.kg : s.profile.weightKg, units);
+  const [v, setV] = useState(+start.toFixed(1));
+  const step = units === 'metric' ? 0.1 : 0.2;
+  const already = s.weights[today] != null;
+  const nudge = (d) => setV((x) => +((+x || 0) + d).toFixed(1));
+
+  const save = () => {
+    setWeight(today, displayToKg(v, units));
+    toast(`Saved ${(+v).toFixed(1)} ${unit}`);
+    close();
+  };
+
+  return html`
+    <div class="sheet-head">
+      <span class="icon-btn-spacer" />
+      <span class="sheet-head-title">${already ? 'Update today’s weight' : 'Weigh in'}</span>
+      <button type="button" class="icon-btn" onClick=${close} aria-label="Close"><${Icon} name="close" /></button>
+    </div>
+    <div class="sheet-body weigh">
+      <div class="weigh-row">
+        <button type="button" class="weigh-step" onClick=${() => nudge(-step)} aria-label=${`Minus ${step} ${unit}`}><${Icon} name="minus" /></button>
+        <${NumberInput} className="weigh-input" value=${v} onChange=${setV} suffix=${unit} />
+        <button type="button" class="weigh-step" onClick=${() => nudge(step)} aria-label=${`Plus ${step} ${unit}`}><${Icon} name="plus" /></button>
+      </div>
+      ${latest && latest.key !== today && html`<p class="fine center">Last time: ${fmtWeight(latest.kg, units)} ${relativeDay(latest.key)}</p>`}
+      <p class="tip"><${Icon} name="info" size=${17} /><span>For a steady trend, weigh in first thing in the morning, before eating or drinking.</span></p>
+    </div>
+    <div class="sheet-foot">
+      <button type="button" class="btn btn-primary btn-block" disabled=${!(v > 0)} onClick=${save}>Save</button>
+    </div>`;
+}

@@ -1,7 +1,7 @@
 // App state, persisted to IndexedDB on this device.
 import { useReducer, useEffect } from './vendor/preact.js';
 import { idbEntries, idbSet, idbClear, idbSetMany } from './lib/db.js';
-import { computeTargets, dayTotals, addInto } from './nutrients.js';
+import { computeTargets, dayTotals, addInto, goalFor } from './nutrients.js';
 
 export const THEMES = [
   { value: 'oat', label: 'Oat', hint: 'Warm paper, forest green', color: '#F2EEE6', swatch: ['#F2EEE6', '#2F5D46', '#C4683F'] },
@@ -30,6 +30,7 @@ export const state = {
   profile: null,
   settings: { theme: 'oat', units: 'us', apiKey: '', model: 'claude-opus-5-5', overrides: {}, hideInstallHint: false },
   days: {},
+  weights: {}, // dateKey -> kg
   recents: [],
   supplements: [],
   customFoods: [],
@@ -64,6 +65,7 @@ export async function loadState() {
     for (const [k, v] of await idbEntries()) {
       if (k.startsWith('d:')) state.days[k.slice(2)] = v;
       else if (k === 'profile') state.profile = v;
+      else if (k === 'weights') state.weights = v;
       else if (k === 'settings') state.settings = { ...state.settings, ...v };
       else if (k === 'recents') state.recents = v;
       else if (k === 'supplements') state.supplements = v;
@@ -71,6 +73,10 @@ export async function loadState() {
     }
   } catch (err) {
     console.warn('Storage unavailable', err);
+  }
+  if (state.profile) {
+    const goal = goalFor(state.profile.goal).value; // migrate old goal names
+    if (goal !== state.profile.goal) setProfile({ ...state.profile, goal });
   }
   applyTheme(state.settings.theme);
   state.ready = true;
@@ -149,6 +155,33 @@ export function setSettings(patch) {
 }
 
 export const getTargets = () => computeTargets(state.profile, state.settings.overrides);
+
+// ---- Weight ----
+
+export const weighIns = () => Object.entries(state.weights).sort(([a], [b]) => (a < b ? -1 : 1)).map(([key, kg]) => ({ key, kg }));
+export const latestWeighIn = () => {
+  const all = weighIns();
+  return all.length ? all[all.length - 1] : null;
+};
+
+// Logging a weight also updates the profile, so targets follow your current bodyweight.
+export function setWeight(key, kg) {
+  state.weights = { ...state.weights, [key]: +kg.toFixed(2) };
+  persist('weights', state.weights);
+  const latest = latestWeighIn();
+  if (state.profile && latest) {
+    state.profile = { ...state.profile, weightKg: latest.kg };
+    persist('profile', state.profile);
+  }
+  emit();
+}
+
+export function deleteWeight(key) {
+  const { [key]: _, ...rest } = state.weights;
+  state.weights = rest;
+  persist('weights', rest);
+  emit();
+}
 
 export function applyTheme(theme) {
   const t = THEMES.find((x) => x.value === theme) || THEMES[0];
@@ -230,6 +263,7 @@ export function exportData() {
     profile: state.profile,
     settings,
     days: state.days,
+    weights: state.weights,
     recents: state.recents,
     supplements: state.supplements,
     customFoods: state.customFoods,
@@ -243,6 +277,7 @@ export async function importData(data) {
   const settings = { ...state.settings, ...(data.settings || {}), apiKey };
   const pairs = [
     ['settings', settings],
+    ['weights', data.weights || {}],
     ['recents', data.recents || []],
     ['supplements', data.supplements || []],
     ['customFoods', data.customFoods || []],
@@ -254,6 +289,7 @@ export async function importData(data) {
     profile: data.profile || null,
     settings,
     days: data.days,
+    weights: data.weights || {},
     recents: data.recents || [],
     supplements: data.supplements || [],
     customFoods: data.customFoods || [],
