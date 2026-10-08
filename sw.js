@@ -1,6 +1,6 @@
 // Offline support. App code comes from the network when it can (so updates show up right away)
 // and from the cache when offline. Big, rarely changing files are served from the cache first.
-const CACHE = 'plate-v3';
+const CACHE = 'plate-v4';
 const SHELL = [
   './',
   './index.html',
@@ -34,7 +34,7 @@ const SHELL = [
 ];
 
 self.addEventListener('install', (e) => {
-  e.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting()));
+  e.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL.map((u) => new Request(u, { cache: 'reload' })))).then(() => self.skipWaiting()));
 });
 
 self.addEventListener('activate', (e) => {
@@ -83,7 +83,9 @@ async function networkFirst(req, isNav) {
 function fetchWithin(req, ms) {
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => reject(new Error('timeout')), ms);
-    fetch(req).then((r) => { clearTimeout(timer); resolve(r); }, (e) => { clearTimeout(timer); reject(e); });
+    // no-cache: always check with the server, so old and new files never mix after an update.
+    // (A page navigation can't be copied with new options, so it's re-requested by URL.)
+    fetch(req.mode === 'navigate' ? req.url : req, { cache: 'no-cache' }).then((r) => { clearTimeout(timer); resolve(r); }, (e) => { clearTimeout(timer); reject(e); });
   });
 }
 
