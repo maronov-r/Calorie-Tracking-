@@ -114,6 +114,14 @@ export function usdaFood(i) {
   };
 }
 
+export const foodById = (i) => (DB && Number.isInteger(i) && i >= 0 && i < DB.foods.length ? usdaFood(i) : null);
+export function foodByName(name) {
+  if (!DB) return null;
+  const i = DB.foods.findIndex((f) => f[0] === name);
+  return i < 0 ? null : usdaFood(i);
+}
+export const fullName = (food) => (food.sub ? `${food.name}, ${food.sub}` : food.name);
+
 export function customFood(c) {
   const g = +c.servingG || 0;
   return {

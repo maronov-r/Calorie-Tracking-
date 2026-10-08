@@ -1,12 +1,13 @@
 // The built-in coach: explains the plan in plain words, spots when it needs adjusting,
 // and suggests foods to close the protein gap. All of it runs on the phone, free.
 import {
-  state, getTargets, styleOn, weighIns, latestWeighIn, getDay, totalsFor, weekAverage, dateKey as todayKey, shiftKey,
+  state, getTargets, styleOn, weighIns, latestWeighIn, getDay, totalsFor, weekAverage, mealLabel, dateKey as todayKey, shiftKey,
 } from './store.js';
 import {
-  goalFor, styleFor, ACTIVITY, GOALS, STYLES, MICROS, KG_PER_LB, KETO_NET_CARBS, fmtKcal, fmtWater, ageBand,
+  goalFor, styleFor, ACTIVITY, GOALS, STYLES, MICROS, KG_PER_LB, KETO_NET_CARBS, fmtKcal, fmtWater, ageBand, scale, addInto,
 } from './nutrients.js';
 import { weeklyRate, dayNum, fmtRate } from './weight.js';
+import { search, foodById, foodByName, fullName } from './foods.js';
 
 const lb = (kg) => kg / KG_PER_LB;
 const perWeek = (kg, units) => (units === 'metric' ? `${+kg.toFixed(2)} kg` : `${+lb(kg).toFixed(1)} lb`);
@@ -170,34 +171,77 @@ export function coachLine(today = todayKey()) {
 
 // ---- Protein ideas to close today's gap ----
 
+// Exact USDA entries, so the protein shown matches what you'd log. grams: the portion.
 const QUICK_PROTEIN = [
-  { label: 'Chicken breast, 6 oz', g: 54, q: 'chicken breast' },
-  { label: 'Lean ground beef, 6 oz', g: 44, q: 'ground beef' },
-  { label: 'Salmon, 6 oz', g: 38, q: 'salmon' },
-  { label: 'Can of tuna', g: 27, q: 'tuna' },
-  { label: 'Cottage cheese, 1 cup', g: 25, q: 'cottage cheese' },
-  { label: 'Protein shake', g: 25, q: 'protein powder whey' },
-  { label: 'Greek yogurt, 1 cup', g: 23, q: 'yogurt greek', carby: true },
-  { label: '3 eggs', g: 19, q: 'eggs' },
+  { label: 'Chicken breast, 6 oz cooked', usda: 'Chicken, breast, meat only, cooked, roasted', grams: 170, q: 'chicken breast roasted' },
+  { label: 'Lean ground beef, 6 oz cooked', usda: 'Beef, ground, 93% lean meat / 7% fat, crumbles, cooked, pan-browned', grams: 170, q: 'ground beef 93 crumbles' },
+  { label: 'Salmon, 6 oz cooked', usda: 'Fish, salmon, Atlantic, farmed, cooked, dry heat', grams: 170, q: 'salmon atlantic farmed cooked' },
+  { label: 'Can of tuna', usda: 'Fish, tuna, light, canned in water, drained solids', grams: 165, q: 'tuna light canned water' },
+  { label: 'Cottage cheese, 1 cup', usda: 'Cheese, cottage, lowfat, 1% milkfat', grams: 226, q: 'cottage cheese 1%' },
+  { label: 'Scoop of whey', usda: 'Beverages, Protein powder whey based', grams: 32, q: 'protein powder whey' },
+  { label: 'Greek yogurt, 8 oz', usda: 'Yogurt, Greek, plain, nonfat', grams: 227, q: 'greek yogurt nonfat plain', carby: true },
+  { label: '3 hard-boiled eggs', usda: 'Egg, whole, cooked, hard-boiled', grams: 150, q: 'egg hard-boiled' },
 ];
 
 // One or two foods that together cover what's left, varied by day so it isn't always chicken.
+// Empty until the food database has loaded.
 export function proteinIdeas(left, style, seed = todayKey()) {
   if (left < 8) return [];
-  const pool = QUICK_PROTEIN.filter((f) => !(style === 'keto' && f.carby));
+  const pool = QUICK_PROTEIN.filter((f) => !(style === 'keto' && f.carby)).map((f) => {
+    const food = foodByName(f.usda);
+    return food && { ...f, g: Math.round(((food.base.n.protein || 0) * f.grams) / food.base.g) };
+  }).filter(Boolean);
+  if (!pool.length) return [];
   const singles = pool.map((f) => [f]);
   const pairs = [];
   for (let i = 0; i < pool.length; i++) for (let j = i + 1; j < pool.length; j++) pairs.push([pool[i], pool[j]]);
   const score = (combo) => {
-    const sum = combo.reduce((a, f) => a + f.g, 0);
+    const sum = combo.reduce((acc, f) => acc + f.g, 0);
     return sum >= left ? sum - left : 1000 + (left - sum);
   };
   const covers = singles.filter((c) => score(c) < 15);
-  const options = (covers.length ? covers : [...singles, ...pairs]).map((c) => ({ c, s: score(c) })).sort((a, b) => a.s - b.s);
+  const options = (covers.length ? covers : [...singles, ...pairs]).map((c) => ({ c, s: score(c) })).sort((x, y) => x.s - y.s);
   const best = options[0].s;
   const near = options.filter((o) => o.s <= best + 12);
-  const n = [...seed].reduce((a, ch) => a + ch.charCodeAt(0), 0);
+  const n = [...seed].reduce((acc, ch) => acc + ch.charCodeAt(0), 0);
   return near[n % near.length].c;
+}
+
+// ---- Tools for the AI coach ----
+
+const r1 = (v) => Math.round((v || 0) * 10) / 10;
+
+// The coach looks foods up here instead of estimating from memory.
+export function lookUpFoods(input) {
+  const out = (input?.foods || []).slice(0, 12).map(({ query, grams }) => {
+    const g = Math.max(1, Math.min(3000, +grams || 100));
+    const matches = search(String(query || ''), 3).map((f) => {
+      const n = scale(f.base.n, g / f.base.g);
+      return {
+        id: f.ref,
+        name: fullName(f),
+        grams: g,
+        kcal: Math.round(n.kcal || 0),
+        protein_g: r1(n.protein), carbs_g: r1(n.carbs), fiber_g: r1(n.fiber), fat_g: r1(n.fat),
+        portions: f.portions.slice(0, 4).map((x) => `${x.label} = ${x.g} g`),
+      };
+    });
+    return { query, matches: matches.length ? matches : 'No match. Try fewer, plainer words, such as "chicken breast roasted".' };
+  });
+  return JSON.stringify(out);
+}
+
+// Turn a meal the coach suggested into real foods and exact totals. Unknown ids are dropped.
+export function resolveMeal(meal) {
+  const items = (meal?.items || []).map((it) => {
+    const food = foodById(Number(it.food_id));
+    const grams = Math.max(1, Math.min(3000, +it.grams || 0));
+    if (!food || !(+it.grams > 0)) return null;
+    return { food, grams, label: it.label || food.name, n: scale(food.base.n, grams / food.base.g) };
+  }).filter(Boolean);
+  const total = {};
+  for (const it of items) addInto(total, it.n);
+  return { title: meal?.title || 'Meal', items, total };
 }
 
 // ---- Context for the AI coach ----
@@ -221,7 +265,19 @@ export function coachContext(today = todayKey()) {
   const low = week.count
     ? MICROS.map((n) => ({ n, pct: (week.totals[n.key] || 0) / t[n.key] })).filter((x) => x.pct < 0.7).map((x) => `${x.n.name} ${Math.round(x.pct * 100)}%`)
     : [];
-  const todayFoods = getDay(today).entries.map((e) => e.name);
+  const eaten = totalsFor(today);
+  const left = (k) => r(t[k] - (eaten[k] || 0));
+  const netEaten = Math.max(0, (eaten.carbs || 0) - (eaten.fiber || 0));
+  const byMeal = {};
+  for (const e of getDay(today).entries) {
+    const m = mealLabel(e.meal);
+    byMeal[m] = byMeal[m] || { names: [], protein: 0, kcal: 0 };
+    byMeal[m].names.push(e.name);
+    byMeal[m].protein += (e.pu.protein || 0) * e.amount;
+    byMeal[m].kcal += (e.pu.kcal || 0) * e.amount;
+  }
+  const todayLines = Object.entries(byMeal).map(([m, x]) => `${m}: ${x.names.join(', ')} (${r(x.kcal)} kcal, ${r(x.protein)} g protein)`);
+  const now = new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
   const act = ACTIVITY.find((a) => a.value === p.activity) || ACTIVITY[1];
 
   return [
@@ -234,7 +290,8 @@ export function coachContext(today = todayKey()) {
     `Weigh-ins (last 12): ${weights.length ? weights.join('; ') : 'none yet'}.`,
     `Weight trend: ${rate == null ? 'not enough data yet' : `${rate.toFixed(2)} kg a week (${lb(rate).toFixed(2)} lb a week)`}.`,
     `Food logged, last 14 days: ${days.length ? '\n' + days.join('\n') : 'nothing yet'}.`,
-    `Eaten today: ${todayFoods.length ? todayFoods.join(', ') : 'nothing logged yet'}.`,
+    `Logged today so far (it is ${now} now): ${todayLines.length ? todayLines.join('; ') : 'nothing yet'}.`,
+    `Left for today (targets minus what's logged; use these exact numbers): ${left('kcal')} kcal, ${left('protein')} g protein, ${t.netCarbs ? `${r(t.carbs - netEaten)} g net carbs` : `${left('carbs')} g carbs`}, ${left('fat')} g fat. A negative number means over target.`,
     `Vitamins and minerals under 70% of target (7-day average): ${low.length ? low.join(', ') : week.count ? 'none' : 'not enough data'}.`,
   ].join('\n');
 }

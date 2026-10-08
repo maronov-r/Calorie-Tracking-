@@ -103,6 +103,30 @@ const COACH_SCHEMA = {
   type: 'object',
   properties: {
     reply: { type: 'string' },
+    meals: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          title: { type: 'string' },
+          items: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {
+                food_id: { type: 'integer' },
+                grams: { type: 'number' },
+                label: { type: 'string' },
+              },
+              required: ['food_id', 'grams', 'label'],
+              additionalProperties: false,
+            },
+          },
+        },
+        required: ['title', 'items'],
+        additionalProperties: false,
+      },
+    },
     actions: {
       type: 'array',
       items: {
@@ -117,49 +141,107 @@ const COACH_SCHEMA = {
       },
     },
   },
-  required: ['reply', 'actions'],
+  required: ['reply', 'meals', 'actions'],
   additionalProperties: false,
 };
 
-const COACH_SYSTEM = `You are the nutrition coach inside Plate, a personal food, water, vitamin and weight tracker. You talk with one person about their eating. Their profile, targets, recent food log and weight trend are below, and they are current: rely on them instead of asking for numbers you already have.
+const LOOKUP_TOOL = {
+  name: 'look_up_foods',
+  description: 'Look up exact nutrition in the USDA FoodData Central database stored in Plate (about 7,800 everyday foods). Returns up to 3 matches per query, each with an id, the full USDA name, calories, protein, carbs, fiber and fat for the grams you ask for, and the household portions USDA lists with their gram weights (use these to convert cups, eggs, cans and scoops to grams). USDA names say whether a food is raw or cooked: pick the form the person will actually weigh or eat, usually cooked. Look up several foods in one call.',
+  strict: true,
+  input_schema: {
+    type: 'object',
+    properties: {
+      foods: {
+        type: 'array',
+        items: {
+          type: 'object',
+          properties: {
+            query: { type: 'string', description: 'A few plain words, e.g. "chicken breast roasted", "greek yogurt nonfat plain", "ground beef 93 crumbles", "protein powder whey", "rice white long-grain cooked".' },
+            grams: { type: 'number', description: 'How many grams to calculate for.' },
+          },
+          required: ['query', 'grams'],
+          additionalProperties: false,
+        },
+      },
+    },
+    required: ['foods'],
+    additionalProperties: false,
+  },
+};
+
+const COACH_SYSTEM = `You are the nutrition coach inside Plate, a personal food, water, vitamin and weight tracker. You talk with one person about their eating. Their profile, targets, today's log and weight trend are below, and they are current: rely on them instead of asking for numbers you already have.
+
+Accuracy comes first. People use these numbers to hit exact targets, so a wrong number is worse than no number.
+- Never state calories or macros for a food from memory. Look every food up with look_up_foods first and use those numbers. If a food has no good match, say you couldn't find it rather than guessing.
+- Always say whether a weight is cooked or raw, and give amounts the way people measure (6 oz cooked, 1 cup, 1 scoop, 3 large eggs) alongside grams.
+- For anything about the rest of today, start from "Left for today" in the data. Never describe progress loosely ("most of the way", "nearly there"): give the number that would still be left.
+- Check your arithmetic before answering: per-meal splits must add up to the target, and food totals must add up to what you claim.
+
+Suggesting food:
+- Put each concrete meal or snack you suggest in "meals": a short title and its items, using the food ids and grams from look_up_foods. The app shows each meal's exact totals and how much of today's target would be left after it, and lets the person log it with one tap.
+- In the reply, name the meals and explain the plan briefly. You don't need to repeat every item's numbers, since the meal cards show them. Any number you do write must match the lookups.
+- Suggest realistic portions for one sitting (for example up to about 8 oz of cooked meat, not a pound).
 
 How to coach:
 - Be direct and practical, like a good coach texting a client. Lead with the answer, then the reason. Use their actual numbers.
-- Keep replies short: usually 2 to 5 sentences, or a short list of "- " bullets when listing foods or steps. Use **bold** sparingly for the key number. No headings, no tables.
+- Keep replies short: usually 2 to 5 sentences, or a short list of "- " bullets. Use **bold** sparingly for the key number. No headings, no tables.
 - Ground advice in mainstream sports nutrition: protein of 1.6 to 2.2 g per kg for people who lift, a 250 to 500 kcal surplus for building muscle, judging progress from the weekly weight trend rather than single weigh-ins.
-- Suggest specific, ordinary foods with rough portions and protein amounts.
 - When they ask about a diet change such as keto, explain what changes (where calories come from) and what stays the same (calories and protein), and what to expect.
 - You are not a doctor. If they mention a medical condition, medication, pregnancy, an eating disorder, or extreme plans (under about 1,200 kcal, fasting for days, losing more than 1% of bodyweight a week), give general guidance and suggest a doctor or registered dietitian.
 
-What Plate can do (offer these as actions when they fit, and only when the person would clearly want them):
+What Plate can change (offer these in "actions" only when the person would clearly want them):
 - set_goal, value one of: cut (lose fat, -500 kcal), cut_slow (-250), maintain, lean_bulk (build muscle, +300 kcal, high protein), bulk (+500).
-- set_style, value one of: balanced (30% fat), performance (higher carb, 20% fat), low_carb (about 100 g carbs), keto (25 g net carbs max). Style changes only carbs and fat; calories and protein stay the same. It applies from today on, so switching for a week and back is fine.
-- adjust_calories, value a whole number of kcal to add or subtract from the daily target, such as "150" or "-150". Use steps of 100 to 250.
-Each action needs a short button label, such as "Switch to keto" or "Add 150 kcal". Return an empty actions list when no change is needed. Never claim you made a change; the person taps the button to apply it.
+- set_style, value one of: balanced (30% fat), performance (higher carb, 20% fat), low_carb (about 100 g carbs), keto (25 g net carbs max). Style changes only carbs and fat; calories and protein stay the same. It applies from today on.
+- adjust_calories, value a whole number of kcal to add to or subtract from the daily target, such as "150" or "-150". Use steps of 100 to 250.
+Each action needs a short button label, such as "Switch to keto" or "Add 150 kcal". Never claim you made a change; the person taps the button. Use empty lists for meals and actions when there are none.
 
 The person's data:
 `;
 
-export async function askCoach({ apiKey, model, history, context }) {
-  const client = await getClient(apiKey);
-  const params = {
-    model,
-    max_tokens: 8000,
-    system: COACH_SYSTEM + context,
-    messages: history.map((m) => ({ role: m.role, content: m.text })),
-    output_config: { effort: 'low', format: { type: 'json_schema', schema: COACH_SCHEMA } },
-  };
-  const msg = model === 'claude-haiku-5-5'
-    ? await client.messages.create(params)
-    : await client.beta.messages.create({ ...params, betas: ['server-side-fallback-2026-07-01'], fallbacks: 'default' });
+const MAX_STEPS = 6;
 
-  if (msg.stop_reason === 'refusal') throw new AiError("The coach can't help with that one. Try asking another way.");
-  if (msg.stop_reason === 'max_tokens') throw new AiError('The answer got cut off. Try a narrower question.');
-  const block = msg.content.find((b) => b.type === 'text');
-  if (!block) throw new AiError('No answer came back. Try again.');
-  let data;
-  try { data = JSON.parse(block.text); } catch { throw new AiError('The answer came back garbled. Try again.'); }
-  return { reply: String(data.reply || '').trim(), actions: Array.isArray(data.actions) ? data.actions : [] };
+// runTool(name, input) -> string. Food lookups run on the phone against the local database.
+export async function askCoach({ apiKey, model, history, context, runTool }) {
+  const client = await getClient(apiKey);
+  const messages = history.map((m) => ({ role: m.role, content: m.text }));
+  for (let step = 0; step < MAX_STEPS; step++) {
+    // Standard endpoint, no server-side fallback: switching models partway through a tool loop isn't safe.
+    const msg = await client.messages.create({
+      model,
+      max_tokens: 16000,
+      system: COACH_SYSTEM + context,
+      tools: [LOOKUP_TOOL],
+      messages,
+      output_config: { effort: 'medium', format: { type: 'json_schema', schema: COACH_SCHEMA } },
+    });
+    if (msg.stop_reason === 'refusal') throw new AiError("The coach can't help with that one. Try asking another way.");
+    if (msg.stop_reason === 'max_tokens') throw new AiError('The answer got cut off. Try a narrower question.');
+    if (msg.stop_reason === 'tool_use') {
+      messages.push({ role: 'assistant', content: msg.content });
+      messages.push({
+        role: 'user',
+        content: msg.content.filter((b) => b.type === 'tool_use').map((b) => {
+          try {
+            return { type: 'tool_result', tool_use_id: b.id, content: runTool(b.name, b.input) };
+          } catch (err) {
+            return { type: 'tool_result', tool_use_id: b.id, content: `Lookup failed: ${err.message}`, is_error: true };
+          }
+        }),
+      });
+      continue;
+    }
+    const block = msg.content.find((b) => b.type === 'text');
+    if (!block) throw new AiError('No answer came back. Try again.');
+    let data;
+    try { data = JSON.parse(block.text); } catch { throw new AiError('The answer came back garbled. Try again.'); }
+    return {
+      reply: String(data.reply || '').trim(),
+      meals: Array.isArray(data.meals) ? data.meals : [],
+      actions: Array.isArray(data.actions) ? data.actions : [],
+    };
+  }
+  throw new AiError('The coach took too many steps on that one. Try a simpler question.');
 }
 
 export function aiErrorMessage(err) {

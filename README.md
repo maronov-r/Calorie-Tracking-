@@ -16,7 +16,7 @@ A calm, private calorie tracker for your phone. It tracks calories, macros, wate
 - **Profile:** your plan with a plain-language coach, your weight trend (smoothed over 7 days) with a weekly rate, 14 days of protein or calories against your goal, how many days you hit protein, and how your vitamins are doing.
 - **Coach (free, built in):** explains what your goal means and exactly how each number is worked out, and after two weeks of weigh-ins it suggests small calorie changes when you drift off pace.
 - **Eating styles:** Balanced, Higher carb, Low carb or Keto. A style changes only how your calories split between carbs and fat, never your calories or protein, and applies from the day you pick it. Keto tracks net carbs.
-- **Ask the coach (optional):** chat with Claude about your eating. It sees your goal, targets, food log and weight trend, and can offer to change your plan with one tap. Uses your API key, about 1 to 3¢ a question.
+- **Ask the coach (optional):** chat with Claude about your eating. It sees your goal, targets, food log and weight trend, and looks every food up in the USDA database instead of guessing. Suggested meals show as cards with totals the app computes, how much of today's target they leave, and a button to log them. It can also offer to change your plan with one tap. Uses your API key, a few cents a question.
 - **Three ways to log food:**
   - **Search** about 7,800 everyday foods from the USDA with full vitamin and mineral data. It works offline.
   - **Scan** a barcode on packaged food (via Open Food Facts).

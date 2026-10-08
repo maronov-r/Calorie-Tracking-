@@ -1,10 +1,12 @@
 import { html, useState, useRef, useEffect } from '../vendor/preact.js';
 import {
-  useStore, state, getTargets, updatePlan, setStyle, setSettings, setCoach, toast, dateKey as todayKey,
+  useStore, state, getTargets, updatePlan, setStyle, setSettings, setCoach, toast, totalsFor, addEntries, mealForNow, mealLabel,
+  dateKey as todayKey,
 } from '../store.js';
 import { Icon, Sheet, Segmented, Empty } from '../ui.js';
-import { GOALS, STYLES, computeTargets, goalFor, styleFor, fmtKcal } from '../nutrients.js';
-import { goalGuide, styleGuide, planSteps, coachContext, COACH_GOALS, COACH_STYLES } from '../coach.js';
+import { GOALS, STYLES, computeTargets, goalFor, styleFor, fmtKcal, fmtNum } from '../nutrients.js';
+import { goalGuide, styleGuide, planSteps, coachContext, lookUpFoods, resolveMeal, COACH_GOALS, COACH_STYLES } from '../coach.js';
+import { loadFoods, foodsReady, makeEntry, fullName } from '../foods.js';
 import { askCoach, aiErrorMessage } from '../ai.js';
 import { ChoiceList } from './settings.js';
 
@@ -124,6 +126,60 @@ function applyAction(a) {
   return false;
 }
 
+const GRAMS = { label: 'g', g: 1, kind: 'g' };
+
+// A meal the coach suggested, with totals the app computes from the food database.
+function MealCard({ meal, logged, onLog }) {
+  const m = resolveMeal(meal);
+  if (!m.items.length) return null;
+  const t = getTargets();
+  const eaten = totalsFor(todayKey());
+  const after = Math.round(t.protein - (eaten.protein || 0) - (m.total.protein || 0));
+  return html`
+    <div class="meal-card">
+      <div class="mc-head">
+        <b>${m.title}</b>
+        <span>${fmtKcal(m.total.kcal)} kcal · <b class="mc-p">${Math.round(m.total.protein || 0)} g protein</b></span>
+      </div>
+      <ul>
+        ${m.items.map((it) => html`
+          <li>
+            <span class="mc-name">${it.label}<small>${Math.round(it.grams)} g · ${fullName(it.food)}</small></span>
+            <span class="mc-val">${fmtNum(it.n.protein || 0)} g</span>
+          </li>`)}
+      </ul>
+      <p class="mc-macros">${Math.round(m.total.carbs || 0)} g carbs · ${Math.round(m.total.fat || 0)} g fat · from USDA data</p>
+      <div class="mc-foot">
+        ${logged
+          ? html`<span class="mc-done"><${Icon} name="check" size=${15} stroke=${2.4} /> Logged</span>`
+          : html`
+            <span class="mc-left">${after > 0 ? html`Leaves <b>${after} g</b> protein for today` : html`Covers today's protein`}</span>
+            <button type="button" class="chip chip-accent" onClick=${onLog}><${Icon} name="plus" size=${15} stroke=${2.2} /> Log it</button>`}
+      </div>
+    </div>`;
+}
+
+// With two or more suggested meals, what they add up to together.
+function MealsTotal({ msg }) {
+  const open = (msg.meals || []).map((meal, i) => (msg.logged?.includes(i) ? null : resolveMeal(meal))).filter((m) => m && m.items.length);
+  if (open.length < 2) return null;
+  const protein = open.reduce((a, m) => a + (m.total.protein || 0), 0);
+  const kcal = open.reduce((a, m) => a + (m.total.kcal || 0), 0);
+  const left = Math.round(getTargets().protein - (totalsFor(todayKey()).protein || 0) - protein);
+  return html`
+    <p class="mc-all">${open.length === 2 ? 'Both' : `All ${open.length}`} together: <b>${Math.round(protein)} g protein</b>, ${fmtKcal(kcal)} kcal.
+      ${left > 0 ? ` Leaves ${left} g protein for today.` : ' Covers today’s protein.'}</p>`;
+}
+
+// What the coach suggested earlier, so follow-up questions can refer to it.
+const withMeals = (m) => {
+  if (m.role !== 'assistant' || !m.meals?.length) return m;
+  const lines = m.meals.map((meal) => `${meal.title}: ${meal.items.map((it) => `${it.label} (food ${it.food_id}, ${it.grams} g)`).join(', ')}`);
+  return { ...m, text: `${m.text}
+
+[Meals I suggested: ${lines.join('; ')}]` };
+};
+
 function Coach({ close, toSettings }) {
   const s = useStore();
   const [text, setText] = useState('');
@@ -132,6 +188,8 @@ function Coach({ close, toSettings }) {
   const listRef = useRef();
   const msgs = s.coach;
   const hasKey = !!s.settings.apiKey;
+  const [, setDbReady] = useState(!!foodsReady());
+  useEffect(() => { loadFoods().then(() => setDbReady(true)).catch(() => {}); }, []);
 
   useEffect(() => {
     const el = listRef.current;
@@ -149,8 +207,13 @@ function Coach({ close, toSettings }) {
     try {
       const recent = history.slice(-12);
       while (recent.length && recent[0].role !== 'user') recent.shift();
-      const res = await askCoach({ apiKey: s.settings.apiKey, model: s.settings.model, history: recent, context: coachContext() });
-      setCoach([...state.coach, { role: 'assistant', text: res.reply || 'Sorry, I lost my train of thought. Ask me again?', actions: res.actions, t: Date.now() }]);
+      await loadFoods();
+      const runTool = (name, input) => {
+        if (name !== 'look_up_foods') throw new Error(`Unknown tool ${name}`);
+        return lookUpFoods(input);
+      };
+      const res = await askCoach({ apiKey: s.settings.apiKey, model: s.settings.model, history: recent.map(withMeals), context: coachContext(), runTool });
+      setCoach([...state.coach, { role: 'assistant', text: res.reply || 'Sorry, I lost my train of thought. Ask me again?', meals: res.meals, actions: res.actions, t: Date.now() }]);
     } catch (err) {
       setCoach(state.coach.slice(0, -1)); // drop the unanswered question so the chat stays in turn
       setText(question);
@@ -158,6 +221,14 @@ function Coach({ close, toSettings }) {
     } finally {
       setBusy(false);
     }
+  };
+
+  const logMeal = (mi, i) => {
+    const m = resolveMeal(state.coach[mi].meals[i]);
+    const meal = mealForNow();
+    addEntries(todayKey(), m.items.map((it) => ({ ...makeEntry(it.food, GRAMS, Math.round(it.grams)), meal })));
+    setCoach(state.coach.map((x, j) => (j === mi ? { ...x, logged: [...(x.logged || []), i] } : x)));
+    toast(`Added to ${mealLabel(meal)}`);
   };
 
   const tapAction = (mi, ai) => {
@@ -177,7 +248,7 @@ function Coach({ close, toSettings }) {
     <div class="sheet-body chat" ref=${listRef}>
       ${!hasKey ? html`
         <${Empty} icon="chat" title="Ask anything about your eating">
-          The coach knows your goal, targets, food log and weight trend, and can change your plan when you ask. It uses Claude through your own API key, at about 1 to 3¢ a question.
+          The coach knows your goal, targets, food log and weight trend, and can change your plan when you ask. It looks foods up in Plate's USDA database instead of guessing. It uses Claude through your own API key, at a few cents a question.
         <//>
         <button type="button" class="btn btn-primary btn-block" onClick=${toSettings}>Add your API key</button>
         <p class="fine center">Your plan's explanation, eating styles and calorie check-ins are free and work without a key.</p>
@@ -192,6 +263,8 @@ function Coach({ close, toSettings }) {
         ? html`<div class="bubble me">${m.text}</div>`
         : html`<div class="bubble coach">
             <${Rich} text=${m.text} />
+            ${foodsReady() && m.meals?.map((meal, i) => html`<${MealCard} meal=${meal} logged=${m.logged?.includes(i)} onLog=${() => logMeal(mi, i)} />`)}
+            ${foodsReady() && html`<${MealsTotal} msg=${m} />`}
             ${m.actions?.length > 0 && html`
               <div class="chat-actions">
                 ${m.actions.map((a, ai) => (m.applied?.includes(ai)

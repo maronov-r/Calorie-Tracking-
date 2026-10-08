@@ -38,9 +38,9 @@ function App() {
     return () => { document.removeEventListener('visibilitychange', check); clearInterval(timer); };
   }, []);
 
-  // Warm up the food database in the background so search is instant.
+  // Warm up the food database in the background so search is instant (and protein ideas can show).
   useEffect(() => {
-    if (s.ready && s.profile) (window.requestIdleCallback || setTimeout)(() => loadFoods().catch(() => {}));
+    if (s.ready && s.profile) (window.requestIdleCallback || setTimeout)(() => loadFoods().then(emit).catch(() => {}));
   }, [s.ready, !!s.profile]);
 
   if (!s.ready) return html`<div class="boot" />`;

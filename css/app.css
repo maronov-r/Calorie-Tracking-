@@ -1344,3 +1344,25 @@ svg { flex-shrink: 0; }
 .chat-input textarea:focus { outline: 2px solid var(--accent); outline-offset: -2px; }
 .send { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 50%; background: var(--accent); color: var(--accent-ink); flex: none; }
 .send:disabled { opacity: 0.35; }
+
+/* Meal cards the coach suggests */
+.meal-card { margin-top: 12px; padding: 12px 14px; border-radius: 14px; background: var(--surface); border: 1px solid var(--line); }
+.mc-head { display: flex; flex-direction: column; gap: 2px; margin-bottom: 6px; }
+.mc-head > b { font-size: 15px; font-weight: 650; }
+.mc-head span { font-size: 13.5px; color: var(--ink-2); }
+.mc-p { color: var(--protein); font-weight: 650; }
+.meal-card ul { list-style: none; padding: 0; margin: 0; }
+.meal-card li { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; padding: 7px 0; }
+.meal-card li + li { border-top: 1px solid var(--line); }
+.mc-name { font-size: 14px; min-width: 0; }
+.mc-name small { display: block; font-size: 12px; color: var(--ink-3); line-height: 1.35; margin-top: 1px; }
+.mc-val { font-size: 14px; font-weight: 650; color: var(--protein); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.mc-macros { font-size: 12.5px; color: var(--ink-3); margin-top: 4px; }
+.mc-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 10px; }
+.mc-left { font-size: 13.5px; color: var(--ink-2); }
+.mc-left b { color: var(--ink); }
+.mc-done { display: inline-flex; align-items: center; gap: 5px; font-size: 13.5px; color: var(--ink-2); }
+.mc-done svg { color: var(--good); }
+.mc-all { margin-top: 10px; font-size: 13.5px; color: var(--ink-2); line-height: 1.45; }
+.mc-all b { color: var(--ink); }
+.bubble.coach:has(.meal-card) { max-width: 100%; align-self: stretch; }
