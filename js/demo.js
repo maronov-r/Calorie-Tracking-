@@ -7,22 +7,23 @@ import { foodByName } from './foods.js';
 
 export const DEMO = !!globalThis.PLATE_DEMO;
 
-export const STARTER_CENTS = 25; // free credit to try the coach
-export const LOW_CENTS = 10; // "running low" from here
-export const AVG_QUESTION_CENTS = 3.5;
+export const PRICE_CENTS = 5; // what one question costs the user: one simple, flat price
+export const AI_COST_CENTS = 3; // what one question costs the owner in AI today
+export const LEAN_AI_COST_CENTS = 1.5; // with prompt caching, a cheaper default model and shorter answers
+export const STARTER_CENTS = 25; // free credit to try the coach: 5 questions
+export const LOW_CENTS = 15; // "running low" from here: 3 questions left
 export const STORE_FEE = 0.15; // Apple and Google take from small developers
-export const AI_SHARE = 0.56; // of each credit cent, what the AI actually costs the owner
 
 export const PACKS = [
   { value: 500, label: '$5', credit: 500 },
-  { value: 1000, label: '$10', credit: 1100 },
-  { value: 2000, label: '$20', credit: 2300 },
+  { value: 1000, label: '$10', credit: 1050 },
+  { value: 2000, label: '$20', credit: 2200 },
 ];
 
 export const fmtMoney = (cents) => `$${(Math.max(0, cents) / 100).toFixed(2)}`;
 export const fmtCents = (cents) => (cents < 100 ? `${cents}¢` : fmtMoney(cents));
 export function questionsFor(cents) {
-  const n = cents / AVG_QUESTION_CENTS;
+  const n = cents / PRICE_CENTS;
   return n >= 100 ? Math.round(n / 10) * 10 : Math.max(1, Math.round(n));
 }
 
@@ -55,8 +56,9 @@ export const setDemoBalance = (cents) => save({ cents }, { t: Date.now(), what: 
 // Where a top-up goes, from the owner's side.
 export function split(pack) {
   const fee = pack.value * STORE_FEE;
-  const ai = pack.credit * AI_SHARE;
-  return { fee, ai, keep: pack.value - fee - ai };
+  const questions = pack.credit / PRICE_CENTS;
+  const ai = questions * AI_COST_CENTS;
+  return { fee, ai, keep: pack.value - fee - ai, keepLean: pack.value - fee - questions * LEAN_AI_COST_CENTS };
 }
 
 // ---- Built-in answers, so the demo needs no API key ----
@@ -153,5 +155,5 @@ function timeline(p, units) {
   return ['On maintain there’s no finish line: your weight holds steady while you get stronger. Most people notice strength gains within a few weeks of regular lifting.'];
 }
 
-// What one demo answer costs: a little more when it looks foods up.
-export const replyCost = (res) => 3 + (res.meals?.length ? 1 : 0);
+// Every question costs the same, so the price is easy to understand.
+export const replyCost = () => PRICE_CENTS;

@@ -4,7 +4,7 @@ import { useStore, eraseAll } from '../store.js';
 import { Icon, Sheet } from '../ui.js';
 import { coachContext } from '../coach.js';
 import {
-  wallet, addCredit, markPrivacySeen, setDemoBalance, split, fmtMoney, fmtCents, questionsFor, PACKS, STARTER_CENTS, AI_SHARE,
+  wallet, addCredit, markPrivacySeen, setDemoBalance, split, fmtMoney, fmtCents, questionsFor, PACKS, STARTER_CENTS, PRICE_CENTS, AI_COST_CENTS, LEAN_AI_COST_CENTS,
 } from '../demo.js';
 import { ChoiceList } from './settings.js';
 
@@ -20,7 +20,7 @@ export function PrivacyPane({ onDone }) {
       <ul class="pp-list">
         <li><b>Everything lives on your phone.</b> Your food log, weight and plan are never uploaded.</li>
         <li><b>Only when you ask</b>, Plate sends your question with a short summary so the coach can answer.</li>
-        <li><b>Nothing is kept.</b> Plate's server passes it to the AI and only writes down the cost, like “3¢”, next to a random number. No name, no email.</li>
+        <li><b>Nothing is kept.</b> Plate's server passes it to the AI and only writes down the cost, like “5¢”, next to a random number. No name, no email.</li>
         <li><b>No ads, no tracking, nothing sold.</b></li>
       </ul>
       <button type="button" class="link" onClick=${() => setShow(!show)}>${show ? 'Hide' : 'See exactly'} what the coach gets</button>
@@ -99,9 +99,10 @@ export function CreditCard({ openSheet }) {
             return html`<div class="owner-row">
               <b>${x.label} top-up: they get about ${questionsFor(x.credit)} questions</b>
               <span>Apple or Google take ${fmtMoney(m.fee)} · the AI bill for those questions is ${fmtMoney(m.ai)} · <b class="keep">you keep ${fmtMoney(m.keep)}</b></span>
+              <span>If you get the AI cost down to ${LEAN_AI_COST_CENTS}¢: <b class="keep">you keep ${fmtMoney(m.keepLean)}</b></span>
             </div>`;
           })}
-          <p class="fine">Each question costs the user about 3.5¢ and costs you about 2¢ in AI. Free starter credit costs you about ${fmtCents(Math.round(STARTER_CENTS * AI_SHARE))} per person who tries the coach.</p>
+          <p class="fine">Every question is ${PRICE_CENTS}¢ for the user and about ${AI_COST_CENTS}¢ for you in AI. The free starter credit (${STARTER_CENTS / PRICE_CENTS} questions) costs you about ${fmtCents(STARTER_CENTS / PRICE_CENTS * AI_COST_CENTS)} per person who tries the coach.</p>
         </div>`}
 
       <p class="list-label">Demo tools</p>
