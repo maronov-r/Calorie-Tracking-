@@ -58,7 +58,7 @@ export function ProfileView({ openSheet, go }) {
   const change = shown.length >= 2 ? shown[shown.length - 1].trend - shown[0].trend : null;
   const changeDisp = change == null ? 0 : units === 'metric' ? change : change / KG_PER_LB;
   const rate = weeklyRate(all, today);
-  const advice = paceAdvice(rate, p.goal);
+  const advice = paceAdvice(rate, p);
 
   // ---- Eating ----
   const days = lastDays(14, today).map((k) => {

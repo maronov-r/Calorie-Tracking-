@@ -1,6 +1,6 @@
 import { html, useState, useEffect } from '../vendor/preact.js';
 import {
-  useStore, getDay, getTargets, totalsFor, weekAverage, MEALS, toggleSupp, setSettings,
+  useStore, state, setProfile, getDay, getTargets, totalsFor, weekAverage, MEALS, toggleSupp, setSettings,
   dateKey as todayKey, shiftKey, parseKey, updateEntry, removeEntry, addEntries, toast, latestWeighIn,
 } from '../store.js';
 import { Ring, Bar, Icon, Stepper, Segmented, Sheet, NutritionSummary, statusColor } from '../ui.js';
@@ -58,6 +58,15 @@ export function Today({ dateKey, setDateKey, openSheet, go }) {
     </header>
 
     <${WeekStrip} dateKey=${dateKey} setDateKey=${setDateKey} today=${today} goal=${t.kcal} />
+
+    ${!s.profile.planVersion && html`
+      <div class="card rebuild-card">
+        <p><b>New: plans built around you.</b> Tell Plate about your workouts, experience and how you like to eat, and it builds calories and protein to match.</p>
+        <div class="coach-btns">
+          <button type="button" class="btn btn-quiet" onClick=${() => setProfile({ ...state.profile, planVersion: 2 })}>Not now</button>
+          <button type="button" class="btn btn-primary" onClick=${() => openSheet({ type: 'builder' })}>Rebuild my plan</button>
+        </div>
+      </div>`}
 
     ${isIOS && !standalone && !s.settings.hideInstallHint && html`
       <div class="hint-card">

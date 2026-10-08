@@ -1,5 +1,5 @@
 import { html, render, useState, useEffect } from './vendor/preact.js';
-import { useStore, loadState, state, emit, dateKey as todayKey } from './store.js';
+import { useStore, loadState, state, emit, rebuildPlan, styleOn, dateKey as todayKey } from './store.js';
 import { Icon, Toast } from './ui.js';
 import { loadFoods } from './foods.js';
 import { Today, EntrySheet } from './views/today.js';
@@ -10,6 +10,7 @@ import { SettingsView } from './views/settings.js';
 import { PlanSheet, CoachSheet } from './views/coach.js';
 import { WaterSheet } from './views/water.js';
 import { SupplementSheet } from './views/supplements.js';
+import { BuilderSheet } from './views/builder.js';
 import { Onboarding } from './views/onboarding.js';
 
 const TABS = [
@@ -78,8 +79,9 @@ function App() {
     ${sheet?.type === 'entry' && html`<${EntrySheet} dateKey=${day} id=${sheet.id} onClose=${closeSheet(sheet)} />`}
     ${sheet?.type === 'weigh' && html`<${WeighInSheet} onClose=${closeSheet(sheet)} />`}
     ${sheet?.type === 'water' && html`<${WaterSheet} dateKey=${day} onClose=${closeSheet(sheet)} />`}
+    ${sheet?.type === 'builder' && html`<${BuilderSheet} profile=${s.profile} style=${styleOn()} units=${s.settings.units} onClose=${closeSheet(sheet)} onSave=${rebuildPlan} />`}
     ${sheet?.type === 'supp' && html`<${SupplementSheet} supp=${sheet.supp} onClose=${closeSheet(sheet)} toSettings=${() => go('settings', 'ai')} />`}
-    ${sheet?.type === 'plan' && html`<${PlanSheet} tab=${sheet.tab} onClose=${closeSheet(sheet)} openCoach=${() => setSheet({ type: 'coach' })} />`}
+    ${sheet?.type === 'plan' && html`<${PlanSheet} tab=${sheet.tab} onClose=${closeSheet(sheet)} openCoach=${() => setSheet({ type: 'coach' })} rebuild=${() => setSheet({ type: 'builder' })} />`}
     ${sheet?.type === 'coach' && html`<${CoachSheet} onClose=${closeSheet(sheet)} toSettings=${() => go('settings', 'ai')} />`}
     ${sheet?.type === 'nutrient' && html`
       <${NutrientSheet} nkey=${sheet.key} dateKey=${day} onClose=${closeSheet(sheet)}

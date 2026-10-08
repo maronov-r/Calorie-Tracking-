@@ -4,7 +4,7 @@ import {
   dateKey as todayKey,
 } from '../store.js';
 import { Icon, Sheet, Segmented, Empty } from '../ui.js';
-import { GOALS, STYLES, FOCUS, computeTargets, goalFor, styleFor, fmtKcal, fmtNum, focusFor, directionOf, macroLabel } from '../nutrients.js';
+import { GOALS, PACES, STYLES, FOCUS, computeTargets, goalFor, styleFor, fmtKcal, fmtNum, focusFor, directionOf, macroLabel } from '../nutrients.js';
 import { goalGuide, styleGuide, planSteps, coachContext, lookUpFoods, resolveMeal, COACH_GOALS, COACH_STYLES } from '../coach.js';
 import { loadFoods, foodsReady, makeEntry, fullName } from '../foods.js';
 import { askCoach, aiErrorMessage } from '../ai.js';
@@ -14,12 +14,12 @@ const Paras = ({ list }) => html`<div class="prose">${list.map((p) => html`<p>${
 
 // ---- Plan: goal, eating style, and how the numbers are worked out ----
 
-export function PlanSheet({ onClose, openCoach, tab }) {
+export function PlanSheet({ onClose, openCoach, rebuild, tab }) {
   return html`<${Sheet} onClose=${onClose} className="sheet-tall" label="Your plan"
-    render=${(close) => html`<${Plan} close=${close} openCoach=${openCoach} startTab=${tab} />`} />`;
+    render=${(close) => html`<${Plan} close=${close} openCoach=${openCoach} rebuild=${() => { close(); setTimeout(rebuild, 240); }} startTab=${tab} />`} />`;
 }
 
-function Plan({ close, openCoach, startTab }) {
+function Plan({ close, openCoach, rebuild, startTab }) {
   const s = useStore();
   const p = s.profile;
   const units = s.settings.units;
@@ -63,11 +63,16 @@ function Plan({ close, openCoach, startTab }) {
             <button type="button" class="link" onClick=${() => setSettings({ overrides: { water: ov.water } })}>Use automatic</button></span>
         </div>`}
 
+      <button type="button" class="btn btn-quiet btn-block rebuild-btn" onClick=${rebuild}><${Icon} name="edit" size=${18} /> Rebuild my plan</button>
+
       <${Segmented} className="seg-sm plan-tabs" options=${[{ value: 'plan', label: 'Goal & style' }, { value: 'math', label: 'How it’s worked out' }]} value=${tab} onChange=${setTab} />
 
       ${tab === 'plan' ? html`
         <p class="list-label">Goal</p>
         <${ChoiceList} options=${goalOpts} value=${p.goal} onChange=${(v) => updatePlan({ goal: v })} />
+        ${(p.goal === 'cut' || p.goal === 'lean_bulk') && html`
+          <p class="list-label">Pace</p>
+          <${Segmented} options=${PACES.map((x) => ({ value: x.value, label: x.label }))} value=${p.pace || 'steady'} onChange=${(v) => updatePlan({ pace: v })} />`}
         <p class="list-label">What ${goalFor(p.goal).label.toLowerCase()} means</p>
         <${Paras} list=${goalGuide(p.goal, t, units)} />
 
@@ -128,6 +133,7 @@ function Rich({ text }) {
 function applyAction(a) {
   const p = state.profile;
   if (a.type === 'set_goal' && COACH_GOALS.includes(a.value)) { updatePlan({ goal: a.value }); return true; }
+  if (a.type === 'set_pace' && PACES.some((x) => x.value === a.value)) { updatePlan({ pace: a.value }); return true; }
   if (a.type === 'set_style' && COACH_STYLES.includes(a.value)) { setStyle(a.value); return true; }
   if (a.type === 'adjust_calories') {
     const v = Math.round(parseFloat(a.value) / 10) * 10;

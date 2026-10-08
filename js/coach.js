@@ -4,7 +4,8 @@ import {
   state, getTargets, styleOn, weighIns, latestWeighIn, getDay, totalsFor, weekAverage, mealLabel, dateKey as todayKey, shiftKey,
 } from './store.js';
 import {
-  goalFor, styleFor, ACTIVITY, TRAINING, trainingFor, GOALS, STYLES, MICROS, KG_PER_LB, KETO_NET_CARBS, fmtKcal, fmtWater, ageBand, scale, addInto,
+  goalFor, styleFor, paceFor, dailyFor, workoutTypeFor, experienceFor, goalPace, normalizeProfile, trainingFor, fatLevel,
+  GOALS, STYLES, DIETS, MICROS, KG_PER_LB, KETO_NET_CARBS, fmtKcal, fmtWater, ageBand, scale, addInto,
   focusFor, directionOf, macroLabel, macroValue, dayMet,
 } from './nutrients.js';
 import { weeklyRate, dayNum, fmtRate } from './weight.js';
@@ -12,48 +13,56 @@ import { search, foodById, foodByName, fullName } from './foods.js';
 
 const lb = (kg) => kg / KG_PER_LB;
 const perWeek = (kg, units) => (units === 'metric' ? `${+kg.toFixed(2)} kg` : `${+lb(kg).toFixed(1)} lb`);
-const paceRange = (g, units) => {
-  const [a, b] = g.pace.map(Math.abs).sort((x, y) => x - y);
+const paceRange = (p, units) => {
+  const range = goalPace(p);
+  if (!range) return '';
+  const [a, b] = range.map(Math.abs).sort((x, y) => x - y);
   return `${perWeek(a, units)} to ${perWeek(b, units)}`;
+};
+const workoutText = (p) => {
+  const w = p.workouts;
+  if (!w.perWeek) return 'no workouts';
+  return `${workoutTypeFor(w.type).label.toLowerCase()} ${w.perWeek}× a week, about ${w.minutes} minutes`;
 };
 
 // ---- What the goal and eating style mean ----
 
 export function goalGuide(goalValue, t, units) {
+  const p = normalizeProfile({ ...state.profile, goal: goalValue });
   const g = goalFor(goalValue);
   const protein = `Eat ${t.protein} g of protein every day. Spread it over 3 to 5 meals of 30 to 50 g each. "How it's worked out" shows where the number comes from.`;
-  const pace = paceRange(g, units);
+  const pace = paceRange(p, units);
+  const lifts = trainingFor(p) === 'lift';
+  if (p.pregnant && g.dir < 0) {
+    return ['While pregnant or breastfeeding, Plate doesn’t set a calorie deficit, so this plan eats at maintenance. Your doctor or midwife can tell you how much extra you need.', protein];
+  }
   switch (g.value) {
+    case 'recomp': return [
+      'Recomposition means losing fat and building muscle at the same time. You eat a little under what you burn, keep protein high and lift regularly. The small deficit slowly burns fat, while lifting and protein give your muscles what they need to grow.',
+      'It works best for people who are new to lifting or have some fat to lose, which is why it’s often the right first goal.',
+      `Expect your weight to stay about the same or drift down slowly, up to about ${perWeek(Math.abs(goalPace(p)?.[0] || 0), units)} a week. The mirror, your waist and your lifts change faster than the scale.`,
+      lifts ? protein : `${protein} Recomposition needs lifting: plan at least 2–3 strength sessions a week.`,
+    ];
     case 'lean_bulk': return [
-      'A lean bulk means eating a little more than you burn, about 300 kcal a day. That gives your body spare material to build muscle while keeping fat gain small. It only works alongside lifting: the extra food feeds the muscle your training asks for.',
+      `Building muscle means eating a little more than you burn. Your surplus is ${fmtKcal(Math.abs(t.auto.delta))} kcal a day, sized to your experience (${experienceFor(p.experience).label.toLowerCase()}). It gives your body spare material to grow while keeping fat gain small. It only works alongside lifting.`,
       `Aim to gain ${pace} a week. Faster than that is mostly fat. If your trend stays flat for 2 to 3 weeks, you aren't eating enough to grow.`,
       protein,
-      'Check the weight trend below every week or two. Once there are two weeks of weigh-ins, the coach suggests small calorie changes if you drift off pace.',
-    ];
-    case 'bulk': return [
-      'A bulk means eating about 500 kcal more than you burn. Size and strength come faster, with more fat along the way. It suits people who are very lean or find it hard to gain.',
-      `Aim to gain ${pace} a week.`,
-      protein,
+      'Once there are two weeks of weigh-ins, the coach suggests small calorie changes if you drift off pace.',
     ];
     case 'maintain': return [
-      'Maintaining means eating about what you burn, so your weight stays roughly level. You can still build some muscle this way, especially if you are new to lifting, while slowly losing a little fat.',
-      protein,
-    ];
-    case 'cut_slow': return [
-      'A slow cut means eating about 250 kcal less than you burn. Fat comes off gradually, and it is easier to keep your strength and muscle. Your Today screen shows fat next to calories, since it is the easiest place to save calories.',
-      `Aim to lose ${pace} a week.`,
+      'Maintaining means eating about what you burn, so your weight stays roughly level. You can still get stronger and build some muscle this way.',
       protein,
     ];
     default: return [
-      'A cut means eating about 500 kcal less than you burn. Calories are what decide fat loss, so they come first. Fat is the easiest place to save them (9 kcal a gram, more than double protein or carbs), so your Today screen shows it next to calories as a limit to stay under.',
+      `Losing fat means eating less than you burn: ${fmtKcal(Math.abs(t.auto.delta))} kcal a day under, set from your bodyweight and the pace you picked (${paceFor(p.pace).label.toLowerCase()}). Calories decide fat loss, so they come first. Fat is the easiest place to save them (9 kcal a gram), so Today shows it next to calories as a limit.`,
       `Aim to lose ${pace} a week. Losing faster than that tends to cost muscle.`,
-      `${protein} Protein matters as much on a cut as on a bulk: with less food coming in, it's what makes the weight you lose fat rather than muscle. Keep lifting too.`,
+      `${protein} Protein matters as much when losing fat as when building: with less food coming in, it's what makes the weight you lose fat rather than muscle.${lifts ? '' : ' Adding 2–3 strength workouts a week helps even more.'}`,
     ];
   }
 }
 
 export function styleGuide(style, t, goalValue) {
-  const gaining = goalFor(goalValue).delta > 0;
+  const gaining = goalFor(goalValue).dir > 0;
   switch (styleFor(style).value) {
     case 'performance': return [
       `Fat drops to about 20% of your calories (${t.fat} g), so more comes from carbs (${t.carbs} g). Carbs refill the energy your muscles burn in hard sessions, so this suits heavy training most days or lots of cardio.`,
@@ -76,11 +85,27 @@ export function styleGuide(style, t, goalValue) {
   }
 }
 
+// A few sentences on why the plan fits this person, for the end of setup.
+export function planWhy(pIn, t, units) {
+  const p = normalizeProfile(pIn);
+  const g = goalFor(p.goal);
+  const out = [
+    `You burn about ${fmtKcal(t.auto.tdee)} kcal a day: ${fmtKcal(t.auto.base)} from your body and normal day (${dailyFor(p.daily).label.toLowerCase()})${t.auto.workout ? `, plus about ${fmtKcal(t.auto.workout)} a day from ${workoutText(p)}` : ''}.`,
+  ];
+  if (p.pregnant && g.dir < 0) out.push('You’re eating at maintenance: Plate never sets a deficit while pregnant or breastfeeding.');
+  else if (g.value === 'cut') out.push(`To lose about ${paceRange(p, units)} a week, you’ll eat ${fmtKcal(Math.abs(t.auto.delta))} kcal under that.`);
+  else if (g.value === 'recomp') out.push(`For losing fat and building muscle together, you’ll eat ${fmtKcal(Math.abs(t.auto.delta))} kcal under that: enough to burn fat, small enough to keep growing.`);
+  else if (g.value === 'lean_bulk') out.push(`To build muscle, you’ll eat ${fmtKcal(t.auto.delta)} kcal over that, sized to your lifting experience.`);
+  else out.push('You’ll eat about what you burn, so your weight holds steady.');
+  out.push(`Protein is ${t.protein} g: ${t.auto.protein.perKg} g per kg of ${t.auto.protein.how === 'weight' ? 'your bodyweight' : 'your lean or adjusted weight'}, set by your goal and how often you lift.`);
+  out.push('These are starting numbers. After two weeks of weigh-ins, Plate checks your trend and suggests small changes.');
+  return out;
+}
+
 // ---- How the numbers are worked out ----
 
 export function planSteps(t, units) {
-  const p = state.profile;
-  const act = ACTIVITY.find((a) => a.value === p.activity) || ACTIVITY[1];
+  const p = normalizeProfile(state.profile);
   const g = goalFor(p.goal);
   const ov = state.settings.overrides || {};
   const height = units === 'metric' ? `${Math.round(p.heightCm)} cm` : (() => { const i = Math.round(p.heightCm / 2.54); return `${Math.floor(i / 12)}′${i % 12}″`; })();
@@ -88,8 +113,10 @@ export function planSteps(t, units) {
   const sign = (v) => (v > 0 ? `+${fmtKcal(v)}` : v < 0 ? `−${fmtKcal(-v)}` : '0');
   const steps = [
     { label: 'Resting burn', value: `${fmtKcal(t.auto.bmr)} kcal`, note: `What your body burns doing nothing at all, from your age (${p.age}), sex, height (${height}) and weight (${weight}). This is the Mifflin–St Jeor formula, the most accurate of the standard ones.` },
-    { label: `× ${act.factor} for activity`, value: `${fmtKcal(t.auto.tdee)} kcal`, note: `“${act.label}” adds the energy you burn moving and training. This is your maintenance: eat this much and your weight stays put.` },
-    { label: `${g.label}`, value: `${sign(t.auto.delta)} kcal`, note: g.delta > 0 ? 'The surplus your body uses to build.' : g.delta < 0 ? 'The deficit that makes your body use stored fat.' : 'No change from maintenance.' },
+    { label: `× ${t.auto.factor} for daily life`, value: `${fmtKcal(t.auto.base)} kcal`, note: `“${dailyFor(p.daily).label}”: everyday moving, not counting workouts.` },
+    { label: 'Workouts', value: `${sign(t.auto.workout)} kcal`, note: p.workouts.perWeek ? `${workoutText(p)}, averaged over the week (Compendium of Physical Activities).` : 'No workouts planned yet.' },
+    { label: 'Calories you burn', value: `${fmtKcal(t.auto.tdee)} kcal`, note: 'Eat this much and your weight stays put.' },
+    { label: g.label, value: `${sign(t.auto.delta)} kcal`, note: g.value === 'recomp' ? 'A small deficit, about 10% of what you burn (5% if you’re already lean): enough to burn fat while lifting and protein build muscle.' : t.auto.delta > 0 ? 'The surplus your body uses to build, sized to your experience and pace.' : t.auto.delta < 0 ? 'The deficit that makes your body use stored fat, sized to your bodyweight and pace and never more than 25% of what you burn.' : p.pregnant ? 'No deficit while pregnant or breastfeeding.' : 'No change from what you burn.' },
   ];
   if (t.auto.adjust) steps.push({ label: 'Coach adjustment', value: `${sign(t.auto.adjust)} kcal`, note: `Added ${p.adjustOn ? `on ${new Date(p.adjustOn + 'T12:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} ` : ''}after checking your weight trend.` });
   steps.push({ label: 'Daily calories', value: `${fmtKcal(t.kcal)} kcal`, total: true, note: ov.kcal ? 'You set this by hand in Settings, so the steps above don’t change it.' : '' });
@@ -103,7 +130,7 @@ export function planSteps(t, units) {
 
 // Plain-language reasoning behind the protein number.
 function proteinNote(t, units) {
-  const p = state.profile;
+  const p = normalizeProfile(state.profile);
   const b = t.auto.protein;
   const w = (kg) => (units === 'metric' ? `${kg.toFixed(1)} kg` : `${lb(kg).toFixed(0)} lb`);
   const train = trainingFor(p);
@@ -111,14 +138,19 @@ function proteinNote(t, units) {
   const base = b.how === 'bodyfat'
     ? `Based on your lean mass (${w(b.lean)} at ${p.bodyFat}% body fat), scaled to a typical healthy body fat: ${w(b.kg)}.`
     : b.how === 'adjusted'
-      ? `Based on ${w(b.kg)} rather than your full ${w(p.weightKg)}: body fat doesn't need protein, so the part of your weight above a BMI of 25 counts at a quarter. Add your body fat % in Settings for a more exact number.`
+      ? `Based on ${w(b.kg)} rather than your full ${w(p.weightKg)}: body fat doesn't need protein, so the part of your weight above a BMI of 25 counts at a quarter. Add your body fat % in your plan for a more exact number.`
       : `Based on your bodyweight, ${w(p.weightKg)}.`;
   const why = train === 'lift'
-    ? (g.delta < 0 ? 'Lifters losing fat need the most protein: it protects muscle while you eat less.' : 'For lifters, about 1.6 g per kg is where extra protein stops adding muscle, even in a surplus.')
+    ? (g.dir < 0 ? 'Lifters losing fat need the most protein: it protects muscle while you eat less.' : 'For lifters, about 1.6 g per kg is where extra protein stops adding muscle, even in a surplus.')
     : train === 'some'
-      ? 'You lift sometimes, so this sits between the lifter and non-lifter amounts.'
-      : (g.delta < 0 ? 'Without weights, about 1.2–1.6 g per kg still helps keep muscle while losing weight.' : 'Without weights, needs are lower; lifting is what makes extra protein pay off.');
-  return `${base} × ${b.perKg} g per kg${units === 'metric' ? '' : ` (${(b.perKg * KG_PER_LB).toFixed(2)} g per lb)`}. ${why}${p.age >= 65 ? ' At 65 and over it never drops below 1.2 g per kg.' : ''} Protein has 4 kcal per gram.`;
+      ? 'You lift once a week or do other training, so this sits between the lifter and non-lifter amounts.'
+      : (g.dir < 0 ? 'Without weights, about 1.2–1.6 g per kg still helps keep muscle while losing weight.' : 'Without weights, needs are lower; lifting is what makes extra protein pay off.');
+  const extra = [
+    p.proteinPref === 'higher' ? 'You chose higher protein, so it’s raised to the top of the researched range (up to 2.2 g per kg).' : '',
+    p.pregnant ? 'During pregnancy and breastfeeding it never drops below 1.1 g per kg.' : '',
+    p.age >= 65 ? 'At 65 and over it never drops below 1.2 g per kg.' : '',
+  ].filter(Boolean).join(' ');
+  return `${base} × ${b.perKg} g per kg${units === 'metric' ? '' : ` (${(b.perKg * KG_PER_LB).toFixed(2)} g per lb)`}. ${why}${extra ? ` ${extra}` : ''} Protein has 4 kcal per gram.`;
 }
 
 // ---- Calorie check-ins from the weight trend ----
@@ -138,15 +170,17 @@ export function calorieCheck(today = todayKey()) {
   const rate = weeklyRate(weighIns(), today);
   if (rate == null) return null;
   const g = goalFor(p.goal);
-  const [lo, hi] = g.pace;
+  const range = goalPace(p);
+  if (!range) return null;
+  const [lo, hi] = range;
   const adjust = p.adjust || 0;
   let delta = 0;
   if (rate < lo) delta = STEP_KCAL;
   else if (rate > hi) delta = -STEP_KCAL;
   if (!delta || Math.abs(adjust + delta) > 600) return null;
   const units = state.settings.units;
-  const gaining = g.delta > 0;
-  const losing = g.delta < 0;
+  const gaining = g.dir > 0;
+  const losing = g.dir < 0;
   const why = delta > 0
     ? (gaining ? (rate <= 0.02 ? "you're not gaining yet, and muscle needs a surplus" : "you're gaining slower than your goal needs") : losing ? "you're losing faster than planned, which can cost muscle" : "you're drifting down")
     : (gaining ? "you're gaining faster than planned, so some of it is likely fat" : losing ? (rate >= -0.02 ? "you're not losing yet" : "you're losing slower than planned") : "you're drifting up");
@@ -187,16 +221,16 @@ export function coachLine(today = todayKey()) {
     const hit = days.filter((k) => (totalsFor(k).protein || 0) >= t.protein * 0.95).length;
     const avg = days.reduce((a, k) => a + (totalsFor(k).protein || 0), 0) / days.length;
     if (hit < days.length * 0.7) {
-      return `You hit protein on ${hit} of your last ${days.length} logged days, averaging ${Math.round(avg)} g. Closing that ${Math.round(t.protein - avg)} g gap is the biggest thing you can do for ${g.delta > 0 ? 'building muscle' : 'keeping muscle'} right now.`;
+      return `You hit protein on ${hit} of your last ${days.length} logged days, averaging ${Math.round(avg)} g. Closing that ${Math.round(t.protein - avg)} g gap is the biggest thing you can do for ${g.dir > 0 || g.value === 'recomp' ? 'building muscle' : 'keeping muscle'} right now.`;
     }
     const kcal = weekAverage(today).totals.kcal || 0;
-    if (g.delta > 0 && kcal < t.kcal * 0.9) {
+    if (g.dir > 0 && kcal < t.kcal * 0.9) {
       return `Protein is on point. Calories are averaging ${fmtKcal(kcal)}, about ${fmtKcal(t.kcal - kcal)} under your goal, and a lean bulk needs that surplus to grow.`;
     }
     return `Protein hit on ${hit} of ${days.length} days. That consistency is what builds results.`;
   }
   if (!latestWeighIn() || weighIns().length < 3) return 'Log your food and weigh in a few mornings a week. After about two weeks the coach can tell whether your calories are right.';
-  return g.delta > 0
+  return g.dir > 0
     ? `Eat about ${fmtKcal(t.kcal)} kcal with ${t.protein} g protein, lift hard, and let the trend do the talking.`
     : `Aim for about ${fmtKcal(t.kcal)} kcal with ${t.protein} g protein each day.`;
 }
@@ -213,13 +247,30 @@ const QUICK_PROTEIN = [
   { label: 'Scoop of whey', usda: 'Beverages, Protein powder whey based', grams: 32, q: 'protein powder whey' },
   { label: 'Greek yogurt, 8 oz', usda: 'Yogurt, Greek, plain, nonfat', grams: 227, q: 'greek yogurt nonfat plain', carby: true },
   { label: '3 hard-boiled eggs', usda: 'Egg, whole, cooked, hard-boiled', grams: 150, q: 'egg hard-boiled' },
+  { label: 'Firm tofu, 1 cup', usda: 'Tofu, raw, firm, prepared with calcium sulfate', grams: 252, q: 'tofu firm' },
+  { label: 'Tempeh, 1 cup', usda: 'Tempeh', grams: 166, q: 'tempeh' },
+  { label: 'Edamame, 1 cup', usda: 'Edamame, frozen, prepared', grams: 155, q: 'edamame' },
+  { label: 'Lentils, 1 cup cooked', usda: 'Lentils, mature seeds, cooked, boiled, without salt', grams: 198, q: 'lentils boiled', carby: true },
 ];
+// What each food contains, for food restrictions.
+const KIND = {
+  'Chicken breast, 6 oz cooked': 'meat', 'Lean ground beef, 6 oz cooked': 'meat', 'Salmon, 6 oz cooked': 'fish', 'Can of tuna': 'fish',
+  'Cottage cheese, 1 cup': 'dairy', 'Scoop of whey': 'dairy', 'Greek yogurt, 8 oz': 'dairy', '3 hard-boiled eggs': 'egg',
+};
+const allowed = (f, diet = []) => {
+  const k = KIND[f.label] || 'plant';
+  if (diet.includes('vegan') && k !== 'plant') return false;
+  if (diet.includes('vegetarian') && (k === 'meat' || k === 'fish')) return false;
+  if (diet.includes('pescatarian') && k === 'meat') return false;
+  if (diet.includes('dairy_free') && k === 'dairy') return false;
+  return true;
+};
 
 // One or two foods that together cover what's left, varied by day so it isn't always chicken.
 // Empty until the food database has loaded.
-export function proteinIdeas(left, style, seed = todayKey()) {
+export function proteinIdeas(left, style, seed = todayKey(), diet = state.profile?.diet || []) {
   if (left < 8) return [];
-  const pool = QUICK_PROTEIN.filter((f) => !(style === 'keto' && f.carby)).map((f) => {
+  const pool = QUICK_PROTEIN.filter((f) => !(style === 'keto' && f.carby) && allowed(f, diet)).map((f) => {
     const food = foodByName(f.usda);
     return food && { ...f, g: Math.round(((food.base.n.protein || 0) * f.grams) / food.base.g) };
   }).filter(Boolean);
@@ -310,16 +361,17 @@ export function coachContext(today = todayKey()) {
   }
   const todayLines = Object.entries(byMeal).map(([m, x]) => `${m}: ${x.names.join(', ')} (${r(x.kcal)} kcal, ${r(x.protein)} g protein)`);
   const now = new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
-  const act = ACTIVITY.find((a) => a.value === p.activity) || ACTIVITY[1];
+  const np = normalizeProfile(p);
+  const pace = goalPace(np);
 
   return [
     `Today is ${today}. The user prefers ${units === 'metric' ? 'metric units (kg, ml)' : 'US units (lb, oz)'}.`,
-    `Profile: ${p.sex}, ${p.age} years, ${Math.round(p.heightCm)} cm (${Math.floor(p.heightCm / 2.54 / 12)} ft ${Math.round(p.heightCm / 2.54) % 12} in), ${p.weightKg.toFixed(1)} kg (${lb(p.weightKg).toFixed(1)} lb). Activity: ${act.label} (${act.hint}).`,
-    `Goal: ${g.label} (id ${g.value}). Healthy pace for this goal: ${g.pace[0]} to ${g.pace[1]} kg a week.`,
-    `Strength training: ${(TRAINING.find((x) => x.value === trainingFor(p)) || TRAINING[0]).label}${p.training ? '' : ' (assumed, not answered yet)'}.${p.bodyFat ? ` Body fat: ${p.bodyFat}%.` : ''} Protein target basis: ${t.auto.protein.perKg} g per kg of ${t.auto.protein.kg.toFixed(1)} kg (${t.auto.protein.how === 'adjusted' ? 'adjusted for body fat using BMI' : t.auto.protein.how === 'bodyfat' ? 'from lean mass' : 'bodyweight'}).`,
+    `Profile: ${p.sex}, ${p.age} years, ${Math.round(p.heightCm)} cm (${Math.floor(p.heightCm / 2.54 / 12)} ft ${Math.round(p.heightCm / 2.54) % 12} in), ${p.weightKg.toFixed(1)} kg (${lb(p.weightKg).toFixed(1)} lb). Daily life: ${dailyFor(np.daily).label}. Workouts: ${workoutText(np)}. Lifting experience: ${experienceFor(np.experience).label}.${np.pregnant ? ' Pregnant or breastfeeding: no calorie deficit; suggest checking with their doctor or midwife.' : ''}${np.diet?.length ? ` Food restrictions: ${np.diet.map((d) => (DIETS.find((x) => x.value === d) || {}).label || d).join(', ')} (only suggest foods that fit).` : ''}`,
+    `Goal: ${g.label} (id ${g.value}), pace ${paceFor(np.pace).label.toLowerCase()}. ${pace ? `Healthy weight change for this plan: ${pace[0].toFixed(2)} to ${pace[1].toFixed(2)} kg a week.` : ''} Body fat level estimate: ${fatLevel(np)}.`,
+    `Training level for protein: ${trainingFor(np)}.${p.bodyFat ? ` Body fat: ${p.bodyFat}%.` : ''}${np.proteinPref === 'higher' ? ' They asked for higher protein.' : ''} Protein target basis: ${t.auto.protein.perKg} g per kg of ${t.auto.protein.kg.toFixed(1)} kg (${t.auto.protein.how === 'adjusted' ? 'adjusted for body fat using BMI' : t.auto.protein.how === 'bodyfat' ? 'from lean mass' : 'bodyweight'}).`,
     `Eating style today: ${styleFor(t.style).label} (id ${t.style}). Their Today screen puts ${macroLabel(focusFor(p, t), t).toLowerCase()} next to calories as ${directionOf(focusFor(p, t), p.goal, t) === 'max' ? 'a limit to stay under' : 'a target to reach'}, so treat that as their main number after calories.`,
     `Daily targets: ${t.kcal} kcal, ${t.protein} g protein, ${t.carbs} g ${t.netCarbs ? 'net carbs (maximum)' : 'carbs'}, ${t.fat} g fat, ${Math.round(t.water)} ml water.`,
-    `How calories were set: resting burn ${t.auto.bmr} kcal × activity ${t.auto.factor} = ${t.auto.tdee} kcal maintenance, ${t.auto.delta >= 0 ? '+' : ''}${t.auto.delta} for the goal${t.auto.adjust ? `, ${t.auto.adjust > 0 ? '+' : ''}${t.auto.adjust} coach adjustment` : ''}.${ov.kcal || ov.protein ? ` The user overrode some targets by hand: ${JSON.stringify(Object.fromEntries(Object.entries(ov).filter(([, v]) => v)))}.` : ''}`,
+    `How calories were set: resting burn ${t.auto.bmr} kcal × daily life ${t.auto.factor} + ${t.auto.workout} kcal a day of workouts = ${t.auto.tdee} kcal maintenance, ${t.auto.delta >= 0 ? '+' : ''}${t.auto.delta} for the goal${t.auto.adjust ? `, ${t.auto.adjust > 0 ? '+' : ''}${t.auto.adjust} coach adjustment` : ''}.${ov.kcal || ov.protein ? ` The user overrode some targets by hand: ${JSON.stringify(Object.fromEntries(Object.entries(ov).filter(([, v]) => v)))}.` : ''}`,
     `Weigh-ins (last 12): ${weights.length ? weights.join('; ') : 'none yet'}.`,
     `Weight trend: ${rate == null ? 'not enough data yet' : `${rate.toFixed(2)} kg a week (${lb(rate).toFixed(2)} lb a week)`}.`,
     `Food logged, last 14 days: ${days.length ? '\n' + days.join('\n') : 'nothing yet'}.`,

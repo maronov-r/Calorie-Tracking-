@@ -1,6 +1,6 @@
 // Weight trend math: smoothing out day-to-day water swings, weekly rate, and pace coaching.
 import { parseKey } from './store.js';
-import { goalFor, KG_PER_LB } from './nutrients.js';
+import { goalFor, goalPace, KG_PER_LB } from './nutrients.js';
 
 export const dayNum = (key) => Math.round(parseKey(key).getTime() / 86400000);
 
@@ -36,14 +36,16 @@ export function fmtRate(kgPerWeek, units) {
   return `${sign}${Math.abs(v).toFixed(units === 'metric' ? 2 : 1)} ${units === 'metric' ? 'kg' : 'lb'} a week`;
 }
 
-// Compare the trend with the goal's healthy pace. tone: 'good' | 'warn'
-export function paceAdvice(rate, goalValue) {
-  if (rate == null) return null;
-  const g = goalFor(goalValue);
-  const [lo, hi] = g.pace;
-  const gaining = g.delta > 0;
-  const losing = g.delta < 0;
+// Compare the trend with the plan's healthy pace (scaled to bodyweight). tone: 'good' | 'warn'
+export function paceAdvice(rate, profile) {
+  const range = goalPace(profile);
+  if (rate == null || !range) return null;
+  const g = goalFor(profile.goal);
+  const [lo, hi] = range;
+  const gaining = g.dir > 0;
+  const losing = g.dir < 0;
   if (rate >= lo && rate <= hi) {
+    if (g.value === 'recomp') return { tone: 'good', text: 'Right where it should be: weight steady or easing down while you build muscle. Watch your lifts and waist, not just the scale.' };
     return { tone: 'good', text: gaining ? 'Right on pace for building muscle. Keep it up.' : losing ? 'Right on pace. Keep protein high to hold on to muscle.' : 'Holding steady. Nice.' };
   }
   if (rate < lo) {

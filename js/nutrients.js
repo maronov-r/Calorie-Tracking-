@@ -56,31 +56,185 @@ export const UPPER = { vitA: 3000, vitC: 2000, vitD: 100, b6: 100, calcium: 2500
 
 const band = (age) => (age < 19 ? 0 : age < 31 ? 1 : age < 51 ? 2 : age < 71 ? 3 : 4);
 
-export const ACTIVITY = [
-  { value: 'sedentary', label: 'Mostly sitting', hint: 'Desk job, little exercise', factor: 1.2 },
-  { value: 'light', label: 'Lightly active', hint: 'Exercise 1–3 days a week', factor: 1.375 },
-  { value: 'moderate', label: 'Active', hint: 'Exercise 3–5 days a week', factor: 1.55 },
-  { value: 'very', label: 'Very active', hint: 'Hard exercise 6–7 days a week', factor: 1.725 },
-  { value: 'athlete', label: 'Athlete', hint: 'Physical job or training twice a day', factor: 1.9 },
+// ---- Your plan: what it's built from ----
+
+// Daily life outside workouts. It multiplies resting burn (Mifflin–St Jeor); workouts are added on top.
+export const DAILY = [
+  { value: 'sitting', label: 'Mostly sitting', hint: 'Desk job or school, under about 5,000 steps', factor: 1.2 },
+  { value: 'some', label: 'On my feet some', hint: 'Errands and walking, about 5,000–10,000 steps', factor: 1.35 },
+  { value: 'lot', label: 'On my feet a lot', hint: 'Retail, teaching, nursing, 10,000+ steps', factor: 1.5 },
+  { value: 'physical', label: 'Physical job', hint: 'Construction, warehouse, farm work', factor: 1.7 },
 ];
 
-// delta: daily calories vs. maintenance. Protein is set separately (see PROTEIN below).
-// pace: healthy weekly weight change in kg [low, high], used to coach from the weight trend.
-// focus: what the Today screen shows next to calories by default.
+// Typical workout intensity in METs (Compendium of Physical Activities).
+export const WORKOUT_TYPES = [
+  { value: 'weights', label: 'Weights', hint: 'Strength training', met: 5 },
+  { value: 'both', label: 'Weights + cardio', hint: 'Lifting plus runs, rides or classes', met: 6 },
+  { value: 'cardio', label: 'Cardio', hint: 'Running, cycling, swimming, classes', met: 7 },
+  { value: 'sports', label: 'Sports', hint: 'Basketball, soccer, martial arts', met: 7 },
+];
+export const WORKOUT_MINUTES = [30, 45, 60, 90];
+
+// gainPct: realistic weight gain while building muscle, % of bodyweight per month. New lifters grow fastest.
+export const EXPERIENCE = [
+  { value: 'new', label: 'New, or haven’t started yet', hint: 'Your fastest gains are ahead of you', gainPct: 1.25 },
+  { value: 'under1', label: 'Less than a year', hint: 'Still gaining quickly', gainPct: 1 },
+  { value: 'mid', label: '1 to 3 years', hint: 'Steady, slower gains', gainPct: 0.6 },
+  { value: 'long', label: '3 years or more', hint: 'Small gains take patience', gainPct: 0.35 },
+];
+
+// dir: -1 losing, 0 holding, +1 gaining. focus: what Today shows next to calories by default.
 export const GOALS = [
-  { value: 'cut', label: 'Lose fat', hint: 'About 1 lb (0.5 kg) a week', delta: -500, pace: [-0.7, -0.25], focus: 'fat' },
-  { value: 'cut_slow', label: 'Lose fat slowly', hint: 'About ½ lb a week, easier to keep muscle', delta: -250, pace: [-0.4, -0.08], focus: 'fat' },
-  { value: 'maintain', label: 'Maintain', hint: 'Stay at your weight and get stronger', delta: 0, pace: [-0.15, 0.15], focus: 'protein' },
-  { value: 'lean_bulk', label: 'Build muscle', hint: 'Lean bulk: small surplus, high protein', delta: 300, pace: [0.1, 0.25], focus: 'protein' },
-  { value: 'bulk', label: 'Bulk', hint: 'Faster gain, with some fat along the way', delta: 500, pace: [0.2, 0.5], focus: 'protein' },
+  { value: 'cut', label: 'Lose fat', hint: 'Lift to keep your muscle while the fat comes off', dir: -1, focus: 'fat' },
+  { value: 'recomp', label: 'Lose fat + build muscle', hint: 'A small deficit, high protein and regular lifting', dir: -1, focus: 'protein' },
+  { value: 'lean_bulk', label: 'Build muscle', hint: 'A small surplus so you have material to grow', dir: 1, focus: 'protein' },
+  { value: 'maintain', label: 'Maintain', hint: 'Stay at your weight and get stronger', dir: 0, focus: 'protein' },
 ];
+
+// cut: % of bodyweight lost per week. gain: multiplier on the experience-based gain rate.
+export const PACES = [
+  { value: 'gentle', label: 'Gentle', cut: 0.25, gain: 0.6 },
+  { value: 'steady', label: 'Steady', cut: 0.5, gain: 1 },
+  { value: 'faster', label: 'Faster', cut: 0.75, gain: 1.5 },
+];
+
+export const DIETS = [
+  { value: 'vegetarian', label: 'Vegetarian' },
+  { value: 'vegan', label: 'Vegan' },
+  { value: 'pescatarian', label: 'Pescatarian' },
+  { value: 'dairy_free', label: 'Dairy-free' },
+  { value: 'gluten_free', label: 'Gluten-free' },
+];
+
+const LEGACY_GOALS = { lose1: 'cut', lose05: 'cut', cut_slow: 'cut', gain05: 'lean_bulk', gain1: 'lean_bulk', bulk: 'lean_bulk' };
+export const goalFor = (value) => GOALS.find((g) => g.value === (LEGACY_GOALS[value] || value)) || GOALS[3];
+export const isGaining = (value) => goalFor(value).dir > 0;
+export const paceFor = (value) => PACES.find((x) => x.value === value) || PACES[1];
+export const dailyFor = (value) => DAILY.find((x) => x.value === value) || DAILY[0];
+export const workoutTypeFor = (value) => WORKOUT_TYPES.find((x) => x.value === value) || WORKOUT_TYPES[0];
+export const experienceFor = (value) => EXPERIENCE.find((x) => x.value === value) || EXPERIENCE[1];
+
+// Profiles saved before the plan builder (one "activity" level plus a lifting answer) mapped onto the new answers.
+const OLD_ACTIVITY = { sedentary: ['sitting', 0], light: ['sitting', 2], moderate: ['some', 4], very: ['some', 6], athlete: ['lot', 6] };
+export function normalizeProfile(p) {
+  if (!p) return p;
+  const out = { ...p };
+  if (p.goal === 'cut_slow' || p.goal === 'lose05') out.pace = out.pace || 'gentle';
+  if (p.goal === 'bulk' || p.goal === 'gain1') out.pace = out.pace || 'faster';
+  out.goal = goalFor(p.goal).value;
+  if (!out.daily) {
+    const [daily, perWeek] = OLD_ACTIVITY[p.activity] || ['sitting', 2];
+    const type = p.training === 'none' ? 'cardio' : p.training === 'some' ? 'both' : 'weights';
+    out.daily = daily;
+    out.workouts = out.workouts || { perWeek: p.training === 'lift' ? Math.max(perWeek, 2) : perWeek, type, minutes: 60 };
+  }
+  out.workouts = { perWeek: 0, type: 'weights', minutes: 60, ...(out.workouts || {}) };
+  out.experience = out.experience || 'under1';
+  out.pace = out.pace || 'steady';
+  return out;
+}
+
+// ---- Calories ----
+
+const round = (v, step = 1) => Math.round(v / step) * step;
+
+export function energyOf(p) {
+  const { sex = 'female', age = 30, heightCm = 170, weightKg = 70 } = p;
+  const bmr = 10 * weightKg + 6.25 * heightCm - 5 * age + (sex === 'male' ? 5 : -161);
+  const factor = dailyFor(p.daily).factor;
+  const w = p.workouts || {};
+  const met = workoutTypeFor(w.type).met;
+  // Net of what you'd burn resting anyway (MET − 1), averaged over the week.
+  const workout = ((+w.perWeek || 0) * (met - 1) * weightKg * ((+w.minutes || 60) / 60)) / 7;
+  return { bmr, factor, base: bmr * factor, workout, tdee: bmr * factor + workout };
+}
+
+// How much body fat there is to lose, from body fat % when known, otherwise BMI.
+export function fatLevel(p) {
+  const male = p.sex === 'male';
+  const bf = p.bodyFat >= 3 && p.bodyFat <= 60 ? p.bodyFat : null;
+  const h = (p.heightCm || 170) / 100;
+  const bmi = (p.weightKg || 70) / (h * h);
+  if (bf != null) return bf >= (male ? 25 : 35) ? 'high' : bf >= (male ? 18 : 28) ? 'some' : bf < (male ? 12 : 20) ? 'lean' : 'normal';
+  return bmi >= 30 ? 'high' : bmi >= 25 ? 'some' : bmi < 22 ? 'lean' : 'normal';
+}
+
+// Daily calories added (+) or removed (−) for the goal, scaled to the person rather than a fixed number.
+export function goalAdjust(p, tdee) {
+  const g = goalFor(p.goal);
+  const pace = paceFor(p.pace);
+  const w = p.weightKg || 70;
+  if (p.pregnant && g.dir < 0) return 0; // never a deficit while pregnant or breastfeeding
+  if (g.value === 'cut') {
+    const pct = p.age < 18 ? Math.min(pace.cut, 0.25) : pace.cut;
+    return -Math.min((w * (pct / 100) * 7700) / 7, tdee * 0.25); // ~7,700 kcal per kg of fat; deficit capped at 25%
+  }
+  if (g.value === 'recomp') return -tdee * (['high', 'some'].includes(fatLevel(p)) ? 0.1 : 0.05);
+  if (g.value === 'lean_bulk') {
+    const kgPerWeek = (w * (experienceFor(p.experience).gainPct / 100) * pace.gain) / 4.33;
+    return Math.min(500, Math.max(100, (kgPerWeek * 7700) / 7));
+  }
+  return 0;
+}
+
+// Healthy weekly weight change for the plan, in kg [low, high]. Used to judge the weight trend.
+export function goalPace(pIn) {
+  const p = normalizeProfile(pIn);
+  const w = p.weightKg || 70;
+  const g = goalFor(p.goal);
+  if (p.pregnant) return null;
+  if (g.value === 'cut') {
+    const t = (w * (p.age < 18 ? Math.min(paceFor(p.pace).cut, 0.25) : paceFor(p.pace).cut)) / 100;
+    return [-1.5 * t, -0.5 * t];
+  }
+  if (g.value === 'recomp') return [-0.0035 * w, 0.0005 * w];
+  if (g.value === 'lean_bulk') {
+    const t = (w * (experienceFor(p.experience).gainPct / 100) * paceFor(p.pace).gain) / 4.33;
+    return [0.5 * t, 1.5 * t];
+  }
+  return [-0.002 * w, 0.002 * w];
+}
+
+// A goal suggestion with the reason, for "Recommend for me".
+export function recommendGoal(pIn) {
+  const p = normalizeProfile(pIn);
+  const lifts = trainingFor(p) !== 'none' && ['weights', 'both'].includes(p.workouts.type);
+  const newish = ['new', 'under1'].includes(p.experience);
+  const level = fatLevel(p);
+  const guessed = !(p.bodyFat >= 3);
+  if (p.pregnant) return { goal: 'maintain', why: 'While pregnant or breastfeeding, Plate doesn’t set a calorie deficit. Your doctor or midwife can tell you how much extra to eat.' };
+  if (level === 'high') {
+    return { goal: 'cut', why: lifts
+      ? 'You have more fat to lose than muscle to gain right now, so losing fat comes first. Lifting while you do keeps your muscle, and newer lifters often build some along the way.'
+      : 'You have more fat to lose than muscle to gain right now, so losing fat comes first. Adding 2–3 strength workouts a week makes sure the weight you lose is fat, not muscle.' };
+  }
+  if (level === 'some' && (p.age || 30) >= 65) {
+    return { goal: lifts ? 'recomp' : 'maintain', why: lifts
+      ? 'At your age, keeping muscle matters more than the number on the scale. A small deficit with plenty of protein and regular lifting trims fat while protecting strength.'
+      : 'At your age, keeping muscle matters more than losing a few pounds. Holding steady, eating enough protein and adding 2–3 strength sessions a week does the most for your health.' };
+  }
+  if (level === 'some') {
+    if (lifts && newish) return { goal: 'recomp', why: 'New lifters with some fat to lose can build muscle and lose fat at the same time. A small deficit, high protein and regular lifting does both.' };
+    if (lifts) return { goal: 'recomp', why: `A slow lean-out while you keep lifting lets you lose fat without giving up muscle.${guessed ? ' Height and weight can’t tell muscle from fat, so add your body fat % for a sharper suggestion.' : ''}` };
+    return { goal: 'cut', why: 'Losing some fat is the most useful goal at your size. Adding strength workouts would protect your muscle while you do.' };
+  }
+  if (lifts && level === 'lean') return { goal: 'lean_bulk', why: 'You’re lean, so a small calorie surplus gives your body what it needs to build muscle without much fat gain.' };
+  if (lifts && newish) return { goal: 'recomp', why: 'You’re at a healthy weight and new to lifting, so you can build muscle while eating close to maintenance and staying lean.' };
+  if (lifts) return { goal: 'lean_bulk', why: 'You’re at a healthy weight with training behind you, so a small surplus is the most efficient way to keep adding muscle.' };
+  return { goal: 'maintain', why: 'You’re at a healthy weight. Holding steady while eating well is a great goal, and adding strength training would let you build muscle too.' };
+}
+
 // ---- Protein ----
-// Strength training is the biggest factor in how much protein actually helps, so it's asked directly.
-export const TRAINING = [
-  { value: 'lift', label: 'Yes, regularly', hint: 'Strength training twice a week or more' },
-  { value: 'some', label: 'Sometimes', hint: 'Now and then, or just getting started' },
-  { value: 'none', label: 'No', hint: 'Cardio, sports or no exercise, but no weights' },
-];
+
+// Weights twice a week or more counts as lifting; that's what makes extra protein pay off.
+export function trainingFor(pIn) {
+  const w = pIn?.workouts || normalizeProfile(pIn || {}).workouts;
+  const n = +w.perWeek || 0;
+  const lifts = w.type === 'weights' || w.type === 'both' ? n : 0;
+  if (lifts >= 2) return 'lift';
+  if (lifts === 1 || n >= 2) return 'some';
+  return 'none';
+}
 
 // Grams per kg of reference weight (below), by training and goal. From the research:
 // - Lifting while maintaining or gaining: ~1.6 g/kg is where extra protein stops adding muscle
@@ -90,13 +244,10 @@ export const TRAINING = [
 // - Not lifting: 1.2–1.6 g/kg while losing weight preserves lean mass (AJCN 2015 review);
 //   about 1.0 at maintenance, above the 0.8 RDA minimum.
 const PROTEIN = {
-  lift: { cut: 2.0, cut_slow: 1.8, maintain: 1.6, lean_bulk: 1.6, bulk: 1.6 },
-  some: { cut: 1.6, cut_slow: 1.5, maintain: 1.3, lean_bulk: 1.5, bulk: 1.5 },
-  none: { cut: 1.4, cut_slow: 1.3, maintain: 1.0, lean_bulk: 1.2, bulk: 1.2 },
+  lift: { cut: 2.0, recomp: 2.0, maintain: 1.6, lean_bulk: 1.6 },
+  some: { cut: 1.6, recomp: 1.6, maintain: 1.3, lean_bulk: 1.5 },
+  none: { cut: 1.4, recomp: 1.4, maintain: 1.0, lean_bulk: 1.2 },
 };
-
-// Building muscle only works with lifting, so that's the sensible guess until someone answers.
-export const trainingFor = (profile) => profile?.training || (goalFor(profile?.goal).delta > 0 ? 'lift' : 'some');
 
 // Body fat doesn't need protein, so multiplying total weight overestimates for bigger bodies.
 // - Body fat % known: lean mass scaled to a typical healthy body fat (15% men, 25% women), never above actual weight.
@@ -113,9 +264,13 @@ export function proteinBasis(profile) {
   return { kg: weightKg, how: 'weight' };
 }
 
-export function proteinPerKg(profile) {
-  const per = PROTEIN[trainingFor(profile)][goalFor(profile?.goal).value];
-  return (profile?.age || 30) >= 65 ? Math.max(per, 1.2) : per; // PROT-AGE: older adults need at least 1.0–1.2
+export function proteinPerKg(pIn) {
+  const p = normalizeProfile(pIn || {});
+  let per = PROTEIN[trainingFor(p)][goalFor(p.goal).value];
+  if (p.proteinPref === 'higher') per = Math.min(2.2, +(per + 0.2).toFixed(1)); // top of the researched range
+  if (p.pregnant) per = Math.max(per, 1.1); // pregnancy and breastfeeding RDA
+  if ((p.age || 30) >= 65) per = Math.max(per, 1.2); // PROT-AGE: older adults need at least 1.0–1.2
+  return per;
 }
 
 // ---- What to put front and center on Today ----
@@ -136,10 +291,10 @@ export function focusFor(profile, t) {
 
 // 'min': a target to reach. 'max': a limit to stay under.
 export function directionOf(key, goalValue, t) {
-  const delta = goalFor(goalValue).delta;
-  if (key === 'kcal') return delta > 0 ? 'min' : 'max';
-  if (key === 'carbs') return t.style === 'keto' || t.style === 'low_carb' || delta < 0 ? 'max' : 'min';
-  if (key === 'fat') return delta < 0 && t.style !== 'keto' && t.style !== 'low_carb' ? 'max' : 'min';
+  const dir = goalFor(goalValue).dir;
+  if (key === 'kcal') return dir > 0 ? 'min' : 'max';
+  if (key === 'carbs') return t.style === 'keto' || t.style === 'low_carb' || dir < 0 ? 'max' : 'min';
+  if (key === 'fat') return dir < 0 && t.style !== 'keto' && t.style !== 'low_carb' ? 'max' : 'min';
   return 'min';
 }
 
@@ -154,9 +309,6 @@ export function dayMet(key, totals, t, dir) {
   return dir === 'max' ? v <= t[key] : v >= t[key];
 }
 
-const LEGACY_GOALS = { lose1: 'cut', lose05: 'cut_slow', gain05: 'lean_bulk', gain1: 'bulk' };
-export const goalFor = (value) => GOALS.find((g) => g.value === (LEGACY_GOALS[value] || value)) || GOALS[2];
-export const isGaining = (value) => goalFor(value).delta > 0;
 
 // How the calories left after protein are split between carbs and fat. Calories and protein never change with style.
 export const STYLES = [
@@ -168,17 +320,15 @@ export const STYLES = [
 export const styleFor = (value) => STYLES.find((s) => s.value === value) || STYLES[0];
 export const KETO_NET_CARBS = 25;
 
-const round = (v, step = 1) => Math.round(v / step) * step;
-
 // adjust (on the profile): calories the coach added or removed after checking your weight trend.
-export function computeTargets(profile, overrides = {}, style = 'balanced') {
-  const { sex = 'female', age = 30, heightCm = 170, weightKg = 70, activity = 'light', goal = 'maintain', adjust = 0 } = profile || {};
-  const bmr = 10 * weightKg + 6.25 * heightCm - 5 * age + (sex === 'male' ? 5 : -161);
-  const act = ACTIVITY.find((a) => a.value === activity) || ACTIVITY[1];
-  const g = goalFor(goal);
+export function computeTargets(profileIn, overrides = {}, style = 'balanced') {
+  const profile = normalizeProfile(profileIn || {});
+  const { sex = 'female', age = 30, weightKg = 70, adjust = 0 } = profile;
+  const e = energyOf(profile);
+  const delta = goalAdjust(profile, e.tdee);
   const floor = sex === 'male' ? 1500 : 1200;
-  const tdee = round(bmr * act.factor, 10);
-  const autoKcal = Math.max(floor, round(bmr * act.factor + g.delta + adjust, 10));
+  const tdee = round(e.tdee, 10);
+  const autoKcal = Math.max(floor, round(e.tdee + delta + adjust, 10));
   const kcal = overrides.kcal || autoKcal;
 
   const basis = proteinBasis(profile);
@@ -204,7 +354,10 @@ export function computeTargets(profile, overrides = {}, style = 'balanced') {
     satfat: round((kcal * 0.1) / 9),
     sodium: 2300,
     sugar: 0,
-    auto: { kcal: autoKcal, bmr: Math.round(bmr), tdee, factor: act.factor, delta: g.delta, adjust, protein: { ...basis, perKg } },
+    auto: {
+      kcal: autoKcal, bmr: Math.round(e.bmr), tdee, factor: e.factor, base: round(e.base, 10), workout: round(e.workout, 10),
+      delta: autoKcal - tdee - adjust, adjust, protein: { ...basis, perKg }, // the goal's real effect after floors and rounding
+    },
   };
   const table = DRI[sex === 'male' ? 'male' : 'female'];
   const b = band(age);

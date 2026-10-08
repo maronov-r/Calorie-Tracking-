@@ -1,10 +1,10 @@
 import { html, useState, useRef, useEffect } from '../vendor/preact.js';
 import {
-  useStore, state, setProfile, setSettings, setWeight, getTargets, updatePlan, THEMES,
-  exportData, importData, eraseAll, toast, dateKey as todayKey,
+  useStore, setSettings, getTargets, THEMES,
+  exportData, importData, eraseAll, toast,
 } from '../store.js';
 import { Icon, Segmented, NumberInput } from '../ui.js';
-import { ACTIVITY, TRAINING, trainingFor, ML_PER_OZ, fmtNum, fmtKcal, computeTargets, goalFor, styleFor, KG_PER_LB } from '../nutrients.js';
+import { dailyFor, workoutTypeFor, experienceFor, normalizeProfile, ML_PER_OZ, fmtNum, fmtKcal, computeTargets, goalFor, styleFor, KG_PER_LB } from '../nutrients.js';
 import { suppSummary } from './supplements.js';
 import { AI_MODELS } from '../ai.js';
 
@@ -51,6 +51,22 @@ export function ProfileFields({ profile, onChange, units }) {
     </div>`;
 }
 
+// What the plan is built from, at a glance.
+function AboutSummary({ p: raw, units }) {
+  const p = normalizeProfile(raw);
+  const inches = Math.round(p.heightCm / 2.54);
+  const height = units === 'metric' ? `${Math.round(p.heightCm)} cm` : `${Math.floor(inches / 12)}′${inches % 12}″`;
+  const weight = units === 'metric' ? `${p.weightKg.toFixed(1)} kg` : `${(p.weightKg / KG_PER_LB).toFixed(1)} lb`;
+  const w = p.workouts;
+  const rows = [
+    ['Body', `${p.sex === 'male' ? 'Male' : 'Female'} · ${p.age} · ${height} · ${weight}${p.bodyFat ? ` · ${p.bodyFat}% body fat` : ''}`],
+    ['Normal day', dailyFor(p.daily).label],
+    ['Workouts', w.perWeek ? `${workoutTypeFor(w.type).label} ${w.perWeek}× a week, ${w.minutes} min` : 'None yet'],
+    ['Lifting', experienceFor(p.experience).label],
+  ];
+  return html`<div class="plan-list">${rows.map(([k, v]) => html`<div><span>${k}</span><b>${v}</b></div>`)}</div>`;
+}
+
 export const ChoiceList = ({ options, value, onChange }) => html`
   <div class="choices" role="radiogroup">
     ${options.map((o) => html`
@@ -73,11 +89,6 @@ export function SettingsView({ go, section, openSheet }) {
   const [showKey, setShowKey] = useState(false);
   const importRef = useRef();
 
-  // A weight typed here counts as today's weigh-in, so the trend and targets stay in sync.
-  const upd = ({ weightKg, ...patch }) => {
-    if (weightKg) setWeight(todayKey(), weightKg);
-    if (Object.keys(patch).length) setProfile({ ...state.profile, ...patch });
-  };
   const handSet = ['kcal', 'protein', 'carbs', 'fat'].filter((k) => ov[k]);
   const setOv = (k, v) => setSettings({ overrides: { ...ov, [k]: v > 0 ? v : undefined } });
   // What each target would be without its own override (carbs and fat follow the calorie/protein targets).
@@ -137,20 +148,8 @@ export function SettingsView({ go, section, openSheet }) {
 
     <section class="card set-section">
       <h2 class="card-title">About you</h2>
-      <${ProfileFields} key=${units} profile=${p} onChange=${upd} units=${units} />
-      <div class="field">
-        <span class="field-label">Activity</span>
-        <select class="select" value=${p.activity} onChange=${(e) => updatePlan({ activity: e.currentTarget.value })}>
-          ${ACTIVITY.map((a) => html`<option value=${a.value}>${a.label}: ${a.hint}</option>`)}
-        </select>
-      </div>
-      <div class="field">
-        <span class="field-label">Strength training <span class="field-hint">sets your protein</span></span>
-        <${Segmented} options=${TRAINING.map((x) => ({ value: x.value, label: x.value === 'lift' ? 'Regularly' : x.label }))} value=${trainingFor(p)}
-          onChange=${(v) => updatePlan({ training: v })} />
-      </div>
-      <${NumberInput} className="field" label="Body fat % (optional, makes protein more exact)" value=${p.bodyFat || ''} placeholder="e.g. 18" suffix="%"
-        onChange=${(v) => (v === '' || (v >= 3 && v <= 60)) && updatePlan({ bodyFat: v || null })} />
+      <${AboutSummary} p=${p} units=${units} />
+      <button type="button" class="btn btn-quiet btn-block" onClick=${() => openSheet({ type: 'builder' })}><${Icon} name="edit" size=${18} /> Rebuild my plan</button>
       <div class="field">
         <span class="field-label">Goal and eating style</span>
         <button type="button" class="select-row" onClick=${() => openSheet({ type: 'plan' })}>

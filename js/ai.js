@@ -196,7 +196,7 @@ const COACH_SCHEMA = {
       items: {
         type: 'object',
         properties: {
-          type: { type: 'string', enum: ['set_goal', 'set_style', 'adjust_calories'] },
+          type: { type: 'string', enum: ['set_goal', 'set_pace', 'set_style', 'adjust_calories'] },
           value: { type: 'string' },
           label: { type: 'string' },
         },
@@ -255,7 +255,8 @@ How to coach:
 - You are not a doctor. If they mention a medical condition, medication, pregnancy, an eating disorder, or extreme plans (under about 1,200 kcal, fasting for days, losing more than 1% of bodyweight a week), give general guidance and suggest a doctor or registered dietitian.
 
 What Plate can change (offer these in "actions" only when the person would clearly want them):
-- set_goal, value one of: cut (lose fat, -500 kcal), cut_slow (-250), maintain, lean_bulk (build muscle, +300 kcal, high protein), bulk (+500).
+- set_goal, value one of: cut (lose fat), recomp (lose fat and build muscle together: about 5–10% under maintenance with high protein and lifting; usually best for new lifters with some fat to lose), lean_bulk (build muscle with a small surplus sized to lifting experience), maintain. Calories are scaled to their body, workouts and pace, so don't quote fixed numbers like "-500".
+- set_pace, value one of: gentle, steady, faster. For cut: about 0.25, 0.5 or 0.75% of bodyweight a week. For lean_bulk: slower or faster gain.
 - set_style, value one of: balanced (30% fat), performance (higher carb, 20% fat), low_carb (about 100 g carbs), keto (25 g net carbs max). Style changes only carbs and fat; calories and protein stay the same. It applies from today on.
 - adjust_calories, value a whole number of kcal to add to or subtract from the daily target, such as "150" or "-150". Use steps of 100 to 250.
 Each action needs a short button label, such as "Switch to keto" or "Add 150 kcal". Never claim you made a change; the person taps the button. Use empty lists for meals and actions when there are none.

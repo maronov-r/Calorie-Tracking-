@@ -1,7 +1,7 @@
 // App state, persisted to IndexedDB on this device.
 import { useReducer, useEffect } from './vendor/preact.js';
 import { idbEntries, idbSet, idbClear, idbSetMany } from './lib/db.js';
-import { computeTargets, dayTotals, addInto, goalFor, styleFor, fmtKcal, ML_PER_OZ } from './nutrients.js';
+import { computeTargets, dayTotals, addInto, normalizeProfile, styleFor, fmtKcal, ML_PER_OZ } from './nutrients.js';
 
 export const THEMES = [
   { value: 'oat', label: 'Oat', hint: 'Warm paper, forest green', color: '#F2EEE6', swatch: ['#F2EEE6', '#2F5D46', '#C4683F'] },
@@ -77,8 +77,9 @@ export async function loadState() {
     console.warn('Storage unavailable', err);
   }
   if (state.profile) {
-    const goal = goalFor(state.profile.goal).value; // migrate old goal names
-    if (goal !== state.profile.goal) setProfile({ ...state.profile, goal });
+    // Older profiles (one activity level, old goal names) are mapped onto the plan builder's answers.
+    const next = normalizeProfile(state.profile);
+    if (JSON.stringify(next) !== JSON.stringify(state.profile)) setProfile(next);
   }
   applyTheme(state.settings.theme);
   state.ready = true;
@@ -183,6 +184,18 @@ export function updatePlan(patch, quiet = false) {
   } else if (after.kcal !== before.kcal || after.protein !== before.protein || after.carbs !== before.carbs) {
     toast(`New plan: ${fmtKcal(after.kcal)} kcal · ${after.protein} g protein`);
   }
+}
+
+// Save a plan from the builder: new answers, a fresh start for coach adjustments, today's eating style.
+export function rebuildPlan(plan, style) {
+  const today = dateKey();
+  const styles = Object.fromEntries(Object.entries(state.profile.styles || {}).filter(([k]) => k < today));
+  styles[today] = style;
+  const weightChanged = Math.abs((plan.weightKg || 0) - (state.profile.weightKg || 0)) > 0.05;
+  setProfile({ ...state.profile, ...plan, styles, adjust: 0, adjustOn: null, checkSnooze: null, planVersion: 2 });
+  if (weightChanged) setWeight(today, plan.weightKg);
+  const t = getTargets();
+  toast(`New plan: ${fmtKcal(t.kcal)} kcal · ${t.protein} g protein`);
 }
 
 export function setStyle(style) {
