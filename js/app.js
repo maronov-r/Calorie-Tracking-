@@ -9,6 +9,7 @@ import { ProfileView, WeighInSheet } from './views/profile.js';
 import { SettingsView } from './views/settings.js';
 import { PlanSheet, CoachSheet } from './views/coach.js';
 import { WaterSheet } from './views/water.js';
+import { SupplementSheet } from './views/supplements.js';
 import { Onboarding } from './views/onboarding.js';
 
 const TABS = [
@@ -77,6 +78,7 @@ function App() {
     ${sheet?.type === 'entry' && html`<${EntrySheet} dateKey=${day} id=${sheet.id} onClose=${closeSheet(sheet)} />`}
     ${sheet?.type === 'weigh' && html`<${WeighInSheet} onClose=${closeSheet(sheet)} />`}
     ${sheet?.type === 'water' && html`<${WaterSheet} dateKey=${day} onClose=${closeSheet(sheet)} />`}
+    ${sheet?.type === 'supp' && html`<${SupplementSheet} supp=${sheet.supp} onClose=${closeSheet(sheet)} toSettings=${() => go('settings', 'ai')} />`}
     ${sheet?.type === 'plan' && html`<${PlanSheet} tab=${sheet.tab} onClose=${closeSheet(sheet)} openCoach=${() => setSheet({ type: 'coach' })} />`}
     ${sheet?.type === 'coach' && html`<${CoachSheet} onClose=${closeSheet(sheet)} toSettings=${() => go('settings', 'ai')} />`}
     ${sheet?.type === 'nutrient' && html`

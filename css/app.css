@@ -22,6 +22,8 @@
   --water-soft: rgba(79, 135, 181, 0.16);
   --chart-kcal: #0B8068;
   --chart-protein: #C4683F;
+  --chart-fat: #3A72A8;
+  --chart-carbs: #A77A12;
   --glow-protein: none;
   --good: #3B7A55;
   --mid: #C9962E;
@@ -59,6 +61,8 @@
   --water-soft: rgba(90, 180, 255, 0.16);
   --chart-kcal: #2FA37E;
   --chart-protein: #E2603F;
+  --chart-fat: #3D8FD6;
+  --chart-carbs: #B58424;
   --glow-protein: drop-shadow(0 0 9px rgba(255, 140, 107, 0.45));
   --good: #C8F169;
   --mid: #FFC85C;
@@ -96,6 +100,8 @@
   --water-soft: rgba(26, 155, 255, 0.14);
   --chart-kcal: #2E5BFF;
   --chart-protein: #E83F65;
+  --chart-fat: #7C4DEB;
+  --chart-carbs: #C98200;
   --glow-protein: none;
   --good: #16A267;
   --mid: #F0A020;
@@ -396,6 +402,7 @@ svg { flex-shrink: 0; }
 .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; align-items: end; }
 .field-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 10px; }
 .form { display: flex; flex-direction: column; gap: 14px; }
+.form > * { flex-shrink: 0; }
 .form .list-label { margin: 6px 0 -4px; }
 
 .choices { display: flex; flex-direction: column; gap: 8px; }
@@ -1060,8 +1067,8 @@ svg { flex-shrink: 0; }
 .hits b { font-weight: 650; font-variant-numeric: tabular-nums; }
 .hit-dots { display: flex; gap: 5px; }
 .hit-dots i { width: 12px; height: 12px; border-radius: 50%; background: var(--track); }
-.hit-dots i.on { background: var(--chart-protein); }
-.hit-dots i.miss { background: transparent; box-shadow: inset 0 0 0 2px var(--chart-protein); opacity: 0.5; }
+.hit-dots i.on { background: var(--hit, var(--chart-protein)); }
+.hit-dots i.miss { background: transparent; box-shadow: inset 0 0 0 2px var(--hit, var(--chart-protein)); opacity: 0.5; }
 .stat-box-sub { font-size: 12.5px; color: var(--ink-3); }
 .stat-pair + .fine { margin-top: 10px; }
 .micro-score { font-size: 15px; margin-bottom: 10px; }
@@ -1366,3 +1373,26 @@ svg { flex-shrink: 0; }
 .mc-all { margin-top: 10px; font-size: 13.5px; color: var(--ink-2); line-height: 1.45; }
 .mc-all b { color: var(--ink); }
 .bubble.coach:has(.meal-card) { max-width: 100%; align-self: stretch; }
+
+/* ============ Supplements ============ */
+
+.scan-label { display: flex; flex-direction: column; gap: 10px; margin-top: 4px; }
+.label-thumb { width: 100%; max-height: 160px; object-fit: cover; border-radius: 14px; }
+.extra-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 10px; }
+.extra-row { display: grid; grid-template-columns: minmax(0, 1fr) 76px 84px 32px; gap: 6px; align-items: center; }
+.extra-name {
+  height: 46px;
+  min-width: 0;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 12px;
+  background: var(--surface-2);
+  color: var(--ink);
+  font: inherit;
+  font-size: 16px;
+}
+.extra-amt .num-wrap { height: 46px; }
+.extra-unit { height: 46px; padding-left: 10px; padding-right: 26px; background-position: right 8px center; font-size: 16px; }
+.nrow.static { cursor: default; }
+.nrow-name small { display: block; font-size: 12px; color: var(--ink-3); font-weight: 400; margin-top: 1px; }
+.card-title .card-meta { margin-left: 6px; font-weight: 500; }

@@ -1,10 +1,10 @@
 import { html, useState, useRef, useEffect } from '../vendor/preact.js';
 import {
-  useStore, state, getTargets, updatePlan, setStyle, setSettings, setCoach, toast, totalsFor, addEntries, mealForNow, mealLabel,
+  useStore, state, getTargets, updatePlan, setStyle, setSettings, setProfile, setCoach, toast, totalsFor, addEntries, mealForNow, mealLabel,
   dateKey as todayKey,
 } from '../store.js';
 import { Icon, Sheet, Segmented, Empty } from '../ui.js';
-import { GOALS, STYLES, computeTargets, goalFor, styleFor, fmtKcal, fmtNum } from '../nutrients.js';
+import { GOALS, STYLES, FOCUS, computeTargets, goalFor, styleFor, fmtKcal, fmtNum, focusFor, directionOf, macroLabel } from '../nutrients.js';
 import { goalGuide, styleGuide, planSteps, coachContext, lookUpFoods, resolveMeal, COACH_GOALS, COACH_STYLES } from '../coach.js';
 import { loadFoods, foodsReady, makeEntry, fullName } from '../foods.js';
 import { askCoach, aiErrorMessage } from '../ai.js';
@@ -32,6 +32,12 @@ function Plan({ close, openCoach, startTab }) {
     const x = computeTargets({ ...p, goal: g.value, adjust: g.value === p.goal ? p.adjust : 0 }, ov, t.style);
     return { value: g.value, label: g.label, hint: `${fmtKcal(x.kcal)} kcal · ${x.protein} g protein` };
   });
+  const autoFocus = focusFor({ ...p, focus: null }, t);
+  const focusText = (k) => `${t[k]} g, ${directionOf(k, p.goal, t) === 'max' ? 'a limit to stay under' : 'a target to reach'}`;
+  const focusOpts = [
+    { value: 'auto', label: `Match my plan: ${macroLabel(autoFocus, t)}`, hint: focusText(autoFocus) },
+    ...FOCUS.map((f) => ({ value: f.value, label: macroLabel(f.value, t), hint: focusText(f.value) })),
+  ];
   const styleOpts = STYLES.map((st) => {
     const x = computeTargets(p, ov, st.value);
     return { value: st.value, label: st.label, hint: `${x.carbs} g ${st.value === 'keto' ? 'net carbs max' : 'carbs'} · ${x.fat} g fat` };
@@ -69,6 +75,13 @@ function Plan({ close, openCoach, startTab }) {
         <${ChoiceList} options=${styleOpts} value=${t.style} onChange=${setStyle} />
         <p class="list-label">${styleFor(t.style).label}</p>
         <${Paras} list=${styleGuide(t.style, t, p.goal)} />
+
+        <p class="list-label">Today screen <span class="field-hint">next to calories</span></p>
+        <${ChoiceList} options=${focusOpts} value=${p.focus || 'auto'} onChange=${(v) => {
+          setProfile({ ...state.profile, focus: v === 'auto' ? null : v });
+          const f = focusFor(state.profile, t);
+          toast(`Today now shows ${macroLabel(f, t).toLowerCase()} next to calories`);
+        }} />
       ` : html`
         <p class="lead">Here's exactly what Plate does with your details. When you weigh in, everything updates.</p>
         <ol class="steps">

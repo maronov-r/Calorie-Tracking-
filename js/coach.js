@@ -5,6 +5,7 @@ import {
 } from './store.js';
 import {
   goalFor, styleFor, ACTIVITY, GOALS, STYLES, MICROS, KG_PER_LB, KETO_NET_CARBS, fmtKcal, fmtWater, ageBand, scale, addInto,
+  focusFor, directionOf, macroLabel, macroValue, dayMet,
 } from './nutrients.js';
 import { weeklyRate, dayNum, fmtRate } from './weight.js';
 import { search, foodById, foodByName, fullName } from './foods.js';
@@ -40,14 +41,14 @@ export function goalGuide(goalValue, t, units) {
       protein,
     ];
     case 'cut_slow': return [
-      'A slow cut means eating about 250 kcal less than you burn. Fat comes off gradually, and it is easier to keep your strength and muscle.',
+      'A slow cut means eating about 250 kcal less than you burn. Fat comes off gradually, and it is easier to keep your strength and muscle. Your Today screen shows fat next to calories, since it is the easiest place to save calories.',
       `Aim to lose ${pace} a week.`,
       protein,
     ];
     default: return [
-      'A cut means eating about 500 kcal less than you burn. Protein is set higher than for other goals, because in a deficit it is what protects your muscle. Keep lifting.',
+      'A cut means eating about 500 kcal less than you burn. Calories are what decide fat loss, so they come first. Fat is the easiest place to save them (9 kcal a gram, more than double protein or carbs), so your Today screen shows it next to calories as a limit to stay under.',
       `Aim to lose ${pace} a week. Losing faster than that tends to cost muscle.`,
-      protein,
+      `${protein} Keeping protein up while you eat less is what makes the weight you lose fat rather than muscle, so keep lifting too.`,
     ];
   }
 }
@@ -151,6 +152,18 @@ export function coachLine(today = todayKey()) {
       : 'You came off keto recently. A quick 2–5 lb jump is water returning, not fat.';
   }
   const days = Array.from({ length: 7 }, (_, i) => shiftKey(today, -i - 1)).filter((k) => getDay(k).entries.length);
+  const focus = focusFor(p, t);
+  if (days.length >= 3 && directionOf(focus, p.goal, t) === 'max') {
+    const label = macroLabel(focus, t).toLowerCase();
+    const under = days.filter((k) => dayMet(focus, totalsFor(k), getTargets(k), 'max')).length;
+    const avg = days.reduce((a, k) => a + macroValue(focus, totalsFor(k), getTargets(k)), 0) / days.length;
+    const kcal = weekAverage(today).totals.kcal || 0;
+    if (under < days.length * 0.7) {
+      return `You stayed under your ${label} limit on ${under} of your last ${days.length} logged days, averaging ${Math.round(avg)} g against ${t[focus]} g. Trimming that is the quickest way to bring calories down.`;
+    }
+    if (kcal > t.kcal * 1.05) return `${macroLabel(focus, t)} is in check, but calories are averaging ${fmtKcal(kcal)}, about ${fmtKcal(kcal - t.kcal)} over your target. Look at portions and drinks.`;
+    return `Under your ${label} limit on ${under} of ${days.length} days. That consistency is what moves the scale.`;
+  }
   if (days.length >= 3) {
     const hit = days.filter((k) => (totalsFor(k).protein || 0) >= t.protein * 0.95).length;
     const avg = days.reduce((a, k) => a + (totalsFor(k).protein || 0), 0) / days.length;
@@ -284,7 +297,7 @@ export function coachContext(today = todayKey()) {
     `Today is ${today}. The user prefers ${units === 'metric' ? 'metric units (kg, ml)' : 'US units (lb, oz)'}.`,
     `Profile: ${p.sex}, ${p.age} years, ${Math.round(p.heightCm)} cm (${Math.floor(p.heightCm / 2.54 / 12)} ft ${Math.round(p.heightCm / 2.54) % 12} in), ${p.weightKg.toFixed(1)} kg (${lb(p.weightKg).toFixed(1)} lb). Activity: ${act.label} (${act.hint}).`,
     `Goal: ${g.label} (id ${g.value}). Healthy pace for this goal: ${g.pace[0]} to ${g.pace[1]} kg a week.`,
-    `Eating style today: ${styleFor(t.style).label} (id ${t.style}).`,
+    `Eating style today: ${styleFor(t.style).label} (id ${t.style}). Their Today screen puts ${macroLabel(focusFor(p, t), t).toLowerCase()} next to calories as ${directionOf(focusFor(p, t), p.goal, t) === 'max' ? 'a limit to stay under' : 'a target to reach'}, so treat that as their main number after calories.`,
     `Daily targets: ${t.kcal} kcal, ${t.protein} g protein, ${t.carbs} g ${t.netCarbs ? 'net carbs (maximum)' : 'carbs'}, ${t.fat} g fat, ${Math.round(t.water)} ml water.`,
     `How calories were set: resting burn ${t.auto.bmr} kcal × activity ${t.auto.factor} = ${t.auto.tdee} kcal maintenance, ${t.auto.delta >= 0 ? '+' : ''}${t.auto.delta} for the goal${t.auto.adjust ? `, ${t.auto.adjust > 0 ? '+' : ''}${t.auto.adjust} coach adjustment` : ''}.${ov.kcal || ov.protein ? ` The user overrode some targets by hand: ${JSON.stringify(Object.fromEntries(Object.entries(ov).filter(([, v]) => v)))}.` : ''}`,
     `Weigh-ins (last 12): ${weights.length ? weights.join('; ') : 'none yet'}.`,

@@ -1,10 +1,11 @@
 import { html, useState, useRef, useEffect } from '../vendor/preact.js';
 import {
-  useStore, state, setProfile, setSettings, setWeight, getTargets, updatePlan, THEMES, saveSupplement, deleteSupplement,
+  useStore, state, setProfile, setSettings, setWeight, getTargets, updatePlan, THEMES,
   exportData, importData, eraseAll, toast, dateKey as todayKey,
 } from '../store.js';
-import { Icon, Segmented, NumberInput, Sheet } from '../ui.js';
-import { ACTIVITY, ML_PER_OZ, MICROS, N, SUPP_PRESETS, fmtNum, fmtKcal, computeTargets, goalFor, styleFor, KG_PER_LB } from '../nutrients.js';
+import { Icon, Segmented, NumberInput } from '../ui.js';
+import { ACTIVITY, ML_PER_OZ, fmtNum, fmtKcal, computeTargets, goalFor, styleFor, KG_PER_LB } from '../nutrients.js';
+import { suppSummary } from './supplements.js';
 import { AI_MODELS } from '../ai.js';
 
 
@@ -68,7 +69,6 @@ export function SettingsView({ go, section, openSheet }) {
   const units = s.settings.units;
   const t = getTargets();
   const ov = s.settings.overrides || {};
-  const [editing, setEditing] = useState(null);
   const [confirmErase, setConfirmErase] = useState(false);
   const [showKey, setShowKey] = useState(false);
   const importRef = useRef();
@@ -193,16 +193,16 @@ export function SettingsView({ go, section, openSheet }) {
 
     <section class="card set-section">
       <h2 class="card-title">Supplements</h2>
-      <p class="fine">Add what you take, then tick it off on the Today screen. It counts toward your vitamins and minerals.</p>
+      <p class="fine">Add what you take, or scan the label, then tick it off on the Today screen. It counts toward your vitamins and minerals, and anything else (creatine, fish oil…) is totaled each day.</p>
       ${s.supplements.length > 0 && html`
         <ul class="supp-list">
           ${s.supplements.map((sp) => html`
-            <li><button type="button" class="supp-item" onClick=${() => setEditing(sp)}>
+            <li><button type="button" class="supp-item" onClick=${() => openSheet({ type: 'supp', supp: sp })}>
               <span class="entry-main"><span class="entry-name">${sp.name}</span><span class="entry-sub">${suppSummary(sp)}</span></span>
               <${Icon} name="edit" size=${18} />
             </button></li>`)}
         </ul>`}
-      <button type="button" class="btn btn-quiet btn-block" onClick=${() => setEditing({})}><${Icon} name="plus" size=${18} /> Add a supplement</button>
+      <button type="button" class="btn btn-quiet btn-block" onClick=${() => openSheet({ type: 'supp', supp: {} })}><${Icon} name="plus" size=${18} /> Add a supplement</button>
     </section>
 
     <section class="card set-section">
@@ -221,53 +221,5 @@ export function SettingsView({ go, section, openSheet }) {
       Targets follow the U.S. Dietary Reference Intakes. This isn’t medical advice.
     </p>
 
-    ${editing && html`<${SupplementSheet} supp=${editing} onClose=${() => setEditing(null)} />`}
   `;
-}
-
-function suppSummary(sp) {
-  const parts = Object.entries(sp.n || {}).filter(([, v]) => v > 0).map(([k, v]) => `${N[k].sym || N[k].name} ${fmtNum(v)} ${N[k].unit}`);
-  if (!parts.length) return 'No nutrients entered';
-  return parts.length > 4 ? `${parts.slice(0, 4).join(' · ')} +${parts.length - 4} more` : parts.join(' · ');
-}
-
-function SupplementSheet({ supp, onClose }) {
-  return html`<${Sheet} onClose=${onClose} className="sheet-tall" label="Supplement"
-    render=${(close) => html`<${SupplementForm} supp=${supp} close=${close} />`} />`;
-}
-
-function SupplementForm({ supp, close }) {
-  const [name, setName] = useState(supp.name || '');
-  const [n, setN] = useState(supp.n || {});
-  const isNew = !supp.id;
-  const usePreset = (pr) => { setName(pr.name); setN(pr.n); };
-  const valid = name.trim() && Object.values(n).some((v) => v > 0);
-  const save = () => {
-    const clean = {};
-    for (const [k, v] of Object.entries(n)) if (v > 0) clean[k] = v;
-    saveSupplement({ ...supp, name: name.trim(), n: clean });
-    close();
-  };
-
-  return html`
-    <div class="sheet-head">
-      <span class="icon-btn-spacer" />
-      <span class="sheet-head-title">${isNew ? 'New supplement' : 'Edit supplement'}</span>
-      <button type="button" class="icon-btn" onClick=${close} aria-label="Close"><${Icon} name="close" /></button>
-    </div>
-    <div class="sheet-body form">
-      ${isNew && html`
-        <p class="list-label">Start from</p>
-        <div class="chips">${SUPP_PRESETS.map((pr) => html`<button type="button" class="chip" onClick=${() => usePreset(pr)}>${pr.name}</button>`)}</div>`}
-      <label class="field"><span class="field-label">Name</span>
-        <input type="text" value=${name} onInput=${(e) => setName(e.currentTarget.value)} placeholder="e.g. Vitamin D3" /></label>
-      <p class="list-label">Amount per daily dose <span class="field-hint">(vitamin D: 1 µg = 40 IU)</span></p>
-      <div class="field-grid">
-        ${MICROS.map((m) => html`<${NumberInput} className="field" label=${m.name} value=${n[m.key] ?? ''} suffix=${m.unit} onChange=${(v) => setN({ ...n, [m.key]: v })} />`)}
-      </div>
-    </div>
-    <div class="sheet-foot ${isNew ? '' : 'two'}">
-      ${!isNew && html`<button type="button" class="btn btn-quiet danger" onClick=${() => { deleteSupplement(supp.id); close(); }}><${Icon} name="trash" size=${18} /> Delete</button>`}
-      <button type="button" class="btn btn-primary ${isNew ? 'btn-block' : ''}" disabled=${!valid} onClick=${save}>Save</button>
-    </div>`;
 }

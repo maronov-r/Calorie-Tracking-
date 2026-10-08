@@ -12,7 +12,7 @@ A calm, private calorie tracker for your phone. It tracks calories, macros, wate
 
 ## What it does
 
-- **Today:** calorie and protein rings side by side, quick protein ideas when you're short, carb and fat bars, water with one-tap buttons for your own bottles (Stanley, Hydro Flask, any size), a grid of vitamin and mineral rings, and a small weigh-in button.
+- **Today:** a calorie ring next to the one macro your plan cares about most (protein to reach when building muscle, fat to stay under when losing fat, net carbs on keto, or your own pick), quick protein ideas when you're short, carb and fat bars, water with one-tap buttons for your own bottles (Stanley, Hydro Flask, any size), a grid of vitamin and mineral rings, and a small weigh-in button.
 - **Profile:** your plan with a plain-language coach, your weight trend (smoothed over 7 days) with a weekly rate, 14 days of protein or calories against your goal, how many days you hit protein, and how your vitamins are doing.
 - **Coach (free, built in):** explains what your goal means and exactly how each number is worked out, and after two weeks of weigh-ins it suggests small calorie changes when you drift off pace.
 - **Eating styles:** Balanced, Higher carb, Low carb or Keto. A style changes only how your calories split between carbs and fat, never your calories or protein, and applies from the day you pick it. Keto tracks net carbs.
@@ -22,8 +22,8 @@ A calm, private calorie tracker for your phone. It tracks calories, macros, wate
   - **Scan** a barcode on packaged food (via Open Food Facts).
   - **Describe** a meal in words or snap a photo, and Claude estimates it (needs your own API key, see below).
 - **Nutrients:** see today or a 7-day average against the U.S. Recommended Dietary Allowances for your age and sex. Tap any nutrient to see where yours came from and which foods are good sources.
-- **Supplements:** add what you take once, then tick it off each day. It counts toward your totals.
-- **Goals:** Lose fat, Lose fat slowly, Maintain, Build muscle (lean bulk, +300 kcal, about 0.9 g protein per lb) or Bulk. Targets are calculated from your age, sex, height, weight and activity level (Mifflin–St Jeor), follow your latest weigh-in, and can be overridden.
+- **Supplements:** add what you take once, by scanning the label with Claude or typing it in, then tick it off each day. Vitamins and minerals count toward your targets; anything else (creatine, fish oil, biotin, herbs) is totaled per day.
+- **Goals:** Lose fat, Lose fat slowly, Maintain, Build muscle (lean bulk, +300 kcal) or Bulk. Protein is 0.9 g per lb of bodyweight for every goal except Maintain (0.7 g per lb). Targets are calculated from your age, sex, height, weight and activity level (Mifflin–St Jeor), follow your latest weigh-in, and can be overridden.
 - **Themes:** Oat (default), Midnight and Porcelain. Change them in Settings.
 
 ## AI logging (optional)

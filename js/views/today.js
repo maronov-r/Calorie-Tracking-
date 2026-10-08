@@ -6,6 +6,7 @@ import {
 import { Ring, Bar, Icon, Stepper, Segmented, Sheet, NutritionSummary, statusColor } from '../ui.js';
 import {
   fmtKcal, fmtWeight, MICROS, VITAMINS, MINERALS, status, fmtQty, scale, isGaining,
+  focusFor, directionOf, macroLabel, macroValue,
 } from '../nutrients.js';
 import { describeAmount } from '../foods.js';
 import { proteinIdeas } from '../coach.js';
@@ -65,11 +66,11 @@ export function Today({ dateKey, setDateKey, openSheet, go }) {
         <button type="button" class="icon-btn sm" onClick=${() => setSettings({ hideInstallHint: true })} aria-label="Dismiss"><${Icon} name="close" size=${16} /></button>
       </div>`}
 
-    <${CalorieCard} totals=${totals} t=${t} gaining=${isGaining(s.profile.goal)} isToday=${dateKey === today} openSheet=${openSheet} />
+    <${CalorieCard} totals=${totals} t=${t} profile=${s.profile} isToday=${dateKey === today} openSheet=${openSheet} />
     <${WaterCard} dateKey=${dateKey} ml=${day.water || 0} goal=${t.water} units=${s.settings.units} openSheet=${openSheet} />
     <${MicroCard} totals=${totals} t=${t} week=${week} hasFood=${day.entries.length > 0}
       openNutrient=${(key) => openSheet({ type: 'nutrient', key })} go=${go} />
-    ${s.supplements.length > 0 && html`<${SuppCard} supps=${s.supplements} taken=${day.supps || []} dateKey=${dateKey} />`}
+    ${s.supplements.length > 0 && html`<${SuppCard} supps=${s.supplements} taken=${day.supps || []} dateKey=${dateKey} openSheet=${openSheet} />`}
     <${Meals} day=${day} openSheet=${openSheet} />
   `;
 }
@@ -101,23 +102,40 @@ function WeekStrip({ dateKey, setDateKey, today, goal }) {
     </div>`;
 }
 
-// Calories and protein side by side: the two numbers that matter most for building muscle.
-function CalorieCard({ totals, t, gaining, isToday, openSheet }) {
+// The one macro that matters most for your plan, next to calories.
+// Building muscle: protein to reach. Losing fat: fat to stay under. Keto or low carb: carbs to stay under.
+function FocusRing({ k, t, totals, dir, onClick }) {
+  const label = macroLabel(k, t);
+  const lower = label.toLowerCase();
+  const v = macroValue(k, totals, t);
+  const left = t[k] - v;
+  const over = dir === 'max' && left < 0;
+  const done = dir === 'min' && left <= 0;
+  const color = over ? 'var(--over)' : `var(--${k})`;
+  return html`
+    <button type="button" class="duo-item" onClick=${onClick}>
+      <${Ring} value=${v} max=${t[k]} size=${148} stroke=${12} color=${color} className=${k === 'protein' ? 'glow-protein' : ''}>
+        ${done
+          ? html`<span class="ring-check" style=${{ color }}><${Icon} name="check" size=${30} stroke=${2.6} /></span><span class="ring-label">${lower} hit</span>`
+          : html`<span class="ring-num">${Math.abs(dir === 'max' ? Math.floor(left) : Math.ceil(left))}<small>g</small></span>
+              <span class="ring-label">${lower} ${over ? 'over' : dir === 'max' ? 'left' : 'to go'}</span>`}
+      <//>
+      <span class="duo-cap"><b>${Math.round(v)}</b> / ${dir === 'max' ? 'max ' : ''}${t[k]} g ${lower}</span>
+    </button>`;
+}
+
+function CalorieCard({ totals, t, profile, isToday, openSheet }) {
   const openNutrient = (key) => openSheet({ type: 'nutrient', key });
+  const gaining = isGaining(profile.goal);
   const eaten = totals.kcal || 0;
   const left = t.kcal - eaten;
   const over = left < 0;
-  const protein = totals.protein || 0;
-  const proteinLeft = t.protein - protein;
-  const proteinHit = proteinLeft <= 0;
-  const ideas = isToday && !proteinHit && (totals.kcal || 0) > 0 ? proteinIdeas(proteinLeft, t.style) : [];
-  // On keto the carb target is a ceiling on net carbs (carbs minus fiber).
-  const rows = [
-    t.netCarbs
-      ? { k: 'carbs', label: 'Net carbs', value: Math.max(0, (totals.carbs || 0) - (totals.fiber || 0)), max: true }
-      : { k: 'carbs', label: 'Carbs', value: totals.carbs || 0 },
-    { k: 'fat', label: 'Fat', value: totals.fat || 0 },
-  ];
+  const focus = focusFor(profile, t);
+  const proteinLeft = t.protein - (totals.protein || 0);
+  const ideas = focus === 'protein' && isToday && proteinLeft > 0 && eaten > 0 ? proteinIdeas(proteinLeft, t.style) : [];
+  const rows = ['protein', 'carbs', 'fat'].filter((k) => k !== focus).map((k) => ({
+    k, label: macroLabel(k, t), value: macroValue(k, totals, t), max: directionOf(k, profile.goal, t) === 'max',
+  }));
   return html`
     <section class="card hero">
       <div class="duo">
@@ -128,14 +146,7 @@ function CalorieCard({ totals, t, gaining, isToday, openSheet }) {
           <//>
           <span class="duo-cap"><b>${fmtKcal(eaten)}</b> / ${fmtKcal(t.kcal)} kcal</span>
         </button>
-        <button type="button" class="duo-item" onClick=${() => openNutrient('protein')}>
-          <${Ring} value=${protein} max=${t.protein} size=${148} stroke=${12} color="var(--protein)" className="glow-protein">
-            ${proteinHit
-              ? html`<span class="ring-check"><${Icon} name="check" size=${30} stroke=${2.6} /></span><span class="ring-label">protein hit</span>`
-              : html`<span class="ring-num">${Math.ceil(proteinLeft)}<small>g</small></span><span class="ring-label">protein to go</span>`}
-          <//>
-          <span class="duo-cap"><b>${Math.round(protein)}</b> / ${t.protein} g protein</span>
-        </button>
+        <${FocusRing} k=${focus} t=${t} totals=${totals} dir=${directionOf(focus, profile.goal, t)} onClick=${() => openNutrient(focus)} />
       </div>
       <div class="macros two">
         ${rows.map(({ k, label, value, max }) => {
@@ -191,10 +202,13 @@ function MicroCard({ totals, t, week, hasFood, openNutrient, go }) {
     </section>`;
 }
 
-function SuppCard({ supps, taken, dateKey }) {
+function SuppCard({ supps, taken, dateKey, openSheet }) {
   return html`
     <section class="card">
-      <div class="card-head"><h2 class="card-title">Supplements</h2><span class="card-meta">${taken.filter((id) => supps.some((s) => s.id === id)).length} / ${supps.length}</span></div>
+      <div class="card-head">
+        <h2 class="card-title">Supplements <span class="card-meta">${taken.filter((id) => supps.some((s) => s.id === id)).length} / ${supps.length}</span></h2>
+        <button type="button" class="link" onClick=${() => openSheet({ type: 'supp', supp: {} })}>Add</button>
+      </div>
       <div class="supp-row">
         ${supps.map((sp) => {
           const on = taken.includes(sp.id);

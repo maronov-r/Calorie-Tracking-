@@ -97,6 +97,70 @@ export async function estimateMeal({ apiKey, model, text, imageB64 }) {
   };
 }
 
+// ---- Supplement labels ----
+
+const SUPP_KEYS = ['vitA', 'vitC', 'vitD', 'vitE', 'vitK', 'b1', 'b2', 'b3', 'b5', 'b6', 'folate', 'b12', 'calcium', 'iron', 'magnesium', 'potassium', 'zinc', 'selenium', 'sodium'];
+
+const LABEL_SCHEMA = {
+  type: 'object',
+  properties: {
+    name: { type: 'string' },
+    ...Object.fromEntries(SUPP_KEYS.map((k) => [FIELDS[k], { type: 'number' }])),
+    other: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: { name: { type: 'string' }, amount: { type: 'number' }, unit: { type: 'string', enum: ['mg', 'µg', 'g', 'IU', 'billion CFU'] } },
+        required: ['name', 'amount', 'unit'],
+        additionalProperties: false,
+      },
+    },
+    note: { type: 'string' },
+  },
+  required: ['name', ...SUPP_KEYS.map((k) => FIELDS[k]), 'other', 'note'],
+  additionalProperties: false,
+};
+
+const LABEL_SYSTEM = `You read supplement labels for a personal tracker. The photo shows a supplement bottle or its Supplement Facts panel. Copy the amounts for one serving exactly as printed; do not estimate from what the product usually contains.
+
+- name: the product as someone would call it, with the brand if visible ("Thorne Vitamin D3", "Optimum Nutrition Creatine").
+- The numeric fields are per serving, in the unit their name says. Convert where needed: vitamin D in µg (IU ÷ 40); vitamin A in µg RAE (if only IU: retinol or retinyl IU × 0.3, beta-carotene IU × 0.05); vitamin E in mg (natural d-alpha IU × 0.67, synthetic dl-alpha IU × 0.45); folate in µg DFE (if the label gives only µg of folic acid, × 1.7). Use 0 for anything not on the label.
+- other: every other active ingredient that has an amount, such as creatine, EPA, DHA, biotin, iodine, copper, manganese, chromium, choline, caffeine, herbal extracts or probiotic counts (as billion CFU). Use the label's amount and the closest allowed unit (mcg is µg). Skip "other ingredients" like capsule materials and fillers.
+- note: one short sentence with the serving size ("Per 2 capsules"), plus anything you couldn't read clearly.
+
+If the photo isn't a supplement label or can't be read, return 0 everywhere, empty other, and say so in the note.`;
+
+export async function readSupplementLabel({ apiKey, model, imageB64 }) {
+  const client = await getClient(apiKey);
+  const params = {
+    model,
+    max_tokens: 16000,
+    system: LABEL_SYSTEM,
+    messages: [{ role: 'user', content: [
+      { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: imageB64 } },
+      { type: 'text', text: 'Read this supplement label.' },
+    ] }],
+    output_config: { effort: 'medium', format: { type: 'json_schema', schema: LABEL_SCHEMA } },
+  };
+  const msg = model === 'claude-haiku-5-5'
+    ? await client.messages.create(params)
+    : await client.beta.messages.create({ ...params, betas: ['server-side-fallback-2026-07-01'], fallbacks: 'default' });
+  if (msg.stop_reason === 'refusal') throw new AiError("Claude couldn't read this one. Try typing it in.");
+  if (msg.stop_reason === 'max_tokens') throw new AiError('The answer got cut off. Try a closer photo of just the facts panel.');
+  const block = msg.content.find((b) => b.type === 'text');
+  if (!block) throw new AiError('Nothing came back. Try again.');
+  let data;
+  try { data = JSON.parse(block.text); } catch { throw new AiError('The answer came back garbled. Try again.'); }
+  const n = {};
+  for (const k of SUPP_KEYS) {
+    const v = +data[FIELDS[k]];
+    if (v > 0) n[k] = +v.toPrecision(4);
+  }
+  const extra = (data.other || []).filter((x) => x.name && +x.amount > 0).map((x) => ({ name: x.name, amount: +x.amount, unit: x.unit }));
+  if (!Object.keys(n).length && !extra.length) throw new AiError(data.note || "Couldn't find any amounts on that label. Try a closer, sharper photo of the facts panel.");
+  return { name: String(data.name || '').trim(), n, extra, note: data.note || '' };
+}
+
 // ---- Coach chat ----
 
 const COACH_SCHEMA = {

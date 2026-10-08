@@ -6,6 +6,7 @@ import {
 import { Icon, Bar, Segmented, Sheet, NumberInput, Empty, statusColor } from '../ui.js';
 import {
   goalFor, styleFor, MICROS, fmtKcal, fmtWeight, kgToDisplay, displayToKg, weightUnit, KG_PER_LB,
+  focusFor, directionOf, macroLabel, macroValue, dayMet,
 } from '../nutrients.js';
 import { coachLine, calorieCheck } from '../coach.js';
 import { withTrend, weeklyRate, paceAdvice, fmtRate } from '../weight.js';
@@ -43,7 +44,11 @@ export function ProfileView({ openSheet, go }) {
   const g = goalFor(p.goal);
   const today = todayKey();
   const [range, setRange] = useState('30');
-  const [metric, setMetric] = useState('protein');
+  const focus = focusFor(p, t);
+  const [picked, setMetric] = useState(null);
+  const metric = picked === 'kcal' ? 'kcal' : focus;
+  const fdir = directionOf(focus, p.goal, t);
+  const flabel = macroLabel(focus, t);
 
   // ---- Weight ----
   const all = withTrend(weighIns());
@@ -58,10 +63,15 @@ export function ProfileView({ openSheet, go }) {
   // ---- Eating ----
   const days = lastDays(14, today).map((k) => {
     const tot = totalsFor(k);
-    return { key: k, logged: getDay(k).entries.length > 0, value: (metric === 'kcal' ? tot.kcal : tot.protein) || 0 };
+    return { key: k, logged: getDay(k).entries.length > 0, value: metric === 'kcal' ? tot.kcal || 0 : macroValue(focus, tot, getTargets(k)) };
   });
   const week = weekAverage(today);
-  const hits = lastDays(7, today).map((k) => ({ key: k, logged: getDay(k).entries.length > 0, hit: (totalsFor(k).protein || 0) >= t.protein }));
+  const hits = lastDays(7, today).map((k) => {
+    const logged = getDay(k).entries.length > 0;
+    // A limit only counts once the day is over; a target counts as soon as it's reached.
+    const done = fdir !== 'max' || k !== today;
+    return { key: k, logged, hit: logged && done && dayMet(focus, totalsFor(k), getTargets(k), fdir) };
+  });
   const hitCount = hits.filter((h) => h.hit).length;
   const streak = loggedStreak(today);
 
@@ -111,13 +121,13 @@ export function ProfileView({ openSheet, go }) {
     <section class="card">
       <div class="card-head">
         <h2 class="card-title">Eating</h2>
-        <${Segmented} className="seg-sm" options=${[{ value: 'protein', label: 'Protein' }, { value: 'kcal', label: 'Calories' }]} value=${metric} onChange=${setMetric} />
+        <${Segmented} className="seg-sm" options=${[{ value: focus, label: flabel }, { value: 'kcal', label: 'Calories' }]} value=${metric} onChange=${setMetric} />
       </div>
-      <${IntakeChart} days=${days} goal=${metric === 'kcal' ? t.kcal : t.protein} unit=${metric === 'kcal' ? 'kcal' : 'g'}
-        color=${metric === 'kcal' ? 'var(--chart-kcal)' : 'var(--chart-protein)'} todayKey=${today} />
+      <${IntakeChart} days=${days} goal=${metric === 'kcal' ? t.kcal : t[focus]} unit=${metric === 'kcal' ? 'kcal' : 'g'}
+        color=${metric === 'kcal' ? 'var(--chart-kcal)' : `var(--chart-${focus})`} todayKey=${today} />
       <div class="hits">
-        <span class="hits-label">Protein goal hit</span>
-        <span class="hit-dots">
+        <span class="hits-label">${fdir === 'max' ? `Stayed under ${flabel.toLowerCase()}` : `${flabel} goal hit`}</span>
+        <span class="hit-dots" style=${{ "--hit": `var(--chart-${focus})` }}>
           ${hits.map((h) => html`<i class=${h.hit ? 'on' : h.logged ? 'miss' : ''} title=${h.key} />`)}
         </span>
         <b>${hitCount} of 7 days</b>
@@ -129,9 +139,9 @@ export function ProfileView({ openSheet, go }) {
           <span class="stat-box-sub">goal ${fmtKcal(t.kcal)}</span>
         </div>
         <div class="stat-box">
-          <span class="stat-box-label">Avg protein</span>
-          <span class="stat-box-num">${week.count ? `${Math.round(week.totals.protein || 0)} g` : '–'}</span>
-          <span class="stat-box-sub">goal ${t.protein} g</span>
+          <span class="stat-box-label">Avg ${flabel.toLowerCase()}</span>
+          <span class="stat-box-num">${week.count ? `${Math.round(macroValue(focus, week.totals, t))} g` : '–'}</span>
+          <span class="stat-box-sub">${fdir === 'max' ? 'max' : 'goal'} ${t[focus]} g</span>
         </div>
       </div>
       <p class="fine">${week.count ? `Averages of your last ${week.count} logged day${week.count > 1 ? 's' : ''}, not counting today.` : 'Averages appear after your first full day.'}

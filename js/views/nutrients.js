@@ -1,7 +1,7 @@
 import { html, useState } from '../vendor/preact.js';
 import { useStore, getTargets, totalsFor, weekAverage, getDay, dateKey as todayKey } from '../store.js';
 import { Icon, Ring, Bar, Segmented, Sheet, statusColor } from '../ui.js';
-import { N, INFO, UPPER, MACROS, VITAMINS, MINERALS, MICROS, status, fmtNum } from '../nutrients.js';
+import { N, INFO, UPPER, MACROS, VITAMINS, MINERALS, MICROS, status, fmtNum, suppExtras } from '../nutrients.js';
 import { dayTitle } from './today.js';
 
 const GROUPS = [['Macros & more', MACROS], ['Vitamins', VITAMINS], ['Minerals', MINERALS]];
@@ -45,6 +45,19 @@ export function NutrientsView({ dateKey, openSheet, go }) {
           ? html`<${NutrientRow} n=${{ ...n, name: 'Net carbs (carbs − fiber)', limit: true }} value=${Math.max(0, (totals.carbs || 0) - (totals.fiber || 0))} target=${t.carbs} onClick=${() => openSheet({ type: 'nutrient', key: n.key })} />`
           : html`<${NutrientRow} n=${n} value=${totals[n.key] || 0} target=${t[n.key]} onClick=${() => openSheet({ type: 'nutrient', key: n.key })} />`))}
       </section>`)}
+
+    ${range === 'day' && suppExtras(getDay(dateKey), s.supplements).length > 0 && html`
+      <section class="card nlist">
+        <h2 class="card-title">Also from supplements</h2>
+        ${suppExtras(getDay(dateKey), s.supplements).map((x) => html`
+          <div class="nrow static">
+            <span class="nrow-top">
+              <span class="nrow-name">${x.name}<small>${x.from.join(', ')}</small></span>
+              <span class="nrow-val"><b>${fmtNum(x.amount)}</b> ${x.unit}</span>
+            </span>
+          </div>`)}
+        <p class="fine">No official daily target, so these are totals only.</p>
+      </section>`}
 
     <p class="fine center">Targets are the U.S. Recommended Dietary Allowances for your age and sex.${s.supplements.length ? ' Supplements you tick off count too.' : ''}</p>
   `;

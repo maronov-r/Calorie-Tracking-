@@ -64,15 +64,53 @@ export const ACTIVITY = [
   { value: 'athlete', label: 'Athlete', hint: 'Physical job or training twice a day', factor: 1.9 },
 ];
 
-// delta: daily calories vs. maintenance. protein: g per kg of bodyweight.
+// delta: daily calories vs. maintenance. protein: g per kg of bodyweight, the same 2.0 (0.9 g per lb)
+// for every goal that changes your body; only maintaining needs less.
 // pace: healthy weekly weight change in kg [low, high], used to coach from the weight trend.
+// focus: what the Today screen shows next to calories by default.
 export const GOALS = [
-  { value: 'cut', label: 'Lose fat', hint: 'About 1 lb (0.5 kg) a week', delta: -500, protein: 2.2, pace: [-0.7, -0.25] },
-  { value: 'cut_slow', label: 'Lose fat slowly', hint: 'About ½ lb a week, easier to keep muscle', delta: -250, protein: 2.0, pace: [-0.4, -0.08] },
-  { value: 'maintain', label: 'Maintain', hint: 'Stay at your weight and get stronger', delta: 0, protein: 1.6, pace: [-0.15, 0.15] },
-  { value: 'lean_bulk', label: 'Build muscle', hint: 'Lean bulk: small surplus, high protein', delta: 300, protein: 2.0, pace: [0.1, 0.25] },
-  { value: 'bulk', label: 'Bulk', hint: 'Faster gain, with some fat along the way', delta: 500, protein: 1.8, pace: [0.2, 0.5] },
+  { value: 'cut', label: 'Lose fat', hint: 'About 1 lb (0.5 kg) a week', delta: -500, protein: 2.0, pace: [-0.7, -0.25], focus: 'fat' },
+  { value: 'cut_slow', label: 'Lose fat slowly', hint: 'About ½ lb a week, easier to keep muscle', delta: -250, protein: 2.0, pace: [-0.4, -0.08], focus: 'fat' },
+  { value: 'maintain', label: 'Maintain', hint: 'Stay at your weight and get stronger', delta: 0, protein: 1.6, pace: [-0.15, 0.15], focus: 'protein' },
+  { value: 'lean_bulk', label: 'Build muscle', hint: 'Lean bulk: small surplus, high protein', delta: 300, protein: 2.0, pace: [0.1, 0.25], focus: 'protein' },
+  { value: 'bulk', label: 'Bulk', hint: 'Faster gain, with some fat along the way', delta: 500, protein: 2.0, pace: [0.2, 0.5], focus: 'protein' },
 ];
+// ---- What to put front and center on Today ----
+
+export const FOCUS = [
+  { value: 'protein', label: 'Protein' },
+  { value: 'fat', label: 'Fat' },
+  { value: 'carbs', label: 'Carbs' },
+];
+const MACRO_NAMES = { protein: 'Protein', carbs: 'Carbs', fat: 'Fat' };
+
+// Your own pick, or what fits the plan: carbs on keto and low carb, otherwise the goal's default.
+export function focusFor(profile, t) {
+  if (profile?.focus) return profile.focus;
+  if (t.style === 'keto' || t.style === 'low_carb') return 'carbs';
+  return goalFor(profile?.goal).focus;
+}
+
+// 'min': a target to reach. 'max': a limit to stay under.
+export function directionOf(key, goalValue, t) {
+  const delta = goalFor(goalValue).delta;
+  if (key === 'kcal') return delta > 0 ? 'min' : 'max';
+  if (key === 'carbs') return t.style === 'keto' || t.style === 'low_carb' || delta < 0 ? 'max' : 'min';
+  if (key === 'fat') return delta < 0 && t.style !== 'keto' && t.style !== 'low_carb' ? 'max' : 'min';
+  return 'min';
+}
+
+export const macroLabel = (key, t) => (key === 'carbs' && t.netCarbs ? 'Net carbs' : MACRO_NAMES[key]);
+export const macroValue = (key, totals, t) => (key === 'carbs' && t.netCarbs
+  ? Math.max(0, (totals.carbs || 0) - (totals.fiber || 0))
+  : totals[key] || 0);
+
+// Whether a day met a macro: reached for targets, stayed under for limits.
+export function dayMet(key, totals, t, dir) {
+  const v = macroValue(key, totals, t);
+  return dir === 'max' ? v <= t[key] : v >= t[key];
+}
+
 const LEGACY_GOALS = { lose1: 'cut', lose05: 'cut_slow', gain05: 'lean_bulk', gain1: 'bulk' };
 export const goalFor = (value) => GOALS.find((g) => g.value === (LEGACY_GOALS[value] || value)) || GOALS[2];
 export const isGaining = (value) => goalFor(value).delta > 0;
@@ -241,13 +279,39 @@ export const INFO = {
   selenium: { why: 'An antioxidant that supports your thyroid.', sources: [S('Brazil nuts', 'brazilnuts'), S('Tuna'), S('Sardines'), S('Eggs'), S('Chicken'), S('Turkey')], tip: 'One or two Brazil nuts cover a whole day.' },
 };
 
+// What a supplement can count toward: every tracked vitamin and mineral, plus sodium for electrolytes.
+export const SUPP_FIELDS = [...MICROS, N.sodium];
+
+// extra: ingredients without a daily target. They're totaled per day but not scored.
 export const SUPP_PRESETS = [
   { name: 'Multivitamin', n: { vitA: 900, vitC: 90, vitD: 25, vitE: 15, vitK: 80, b1: 1.2, b2: 1.3, b3: 16, b5: 5, b6: 1.7, folate: 400, b12: 6, calcium: 200, iron: 8, magnesium: 50, zinc: 11, selenium: 55 } },
   { name: 'Vitamin D3 2,000 IU', n: { vitD: 50 } },
+  { name: 'Creatine 5 g', extra: [{ name: 'Creatine monohydrate', amount: 5, unit: 'g' }] },
+  { name: 'Fish oil', extra: [{ name: 'EPA', amount: 180, unit: 'mg' }, { name: 'DHA', amount: 120, unit: 'mg' }] },
+  { name: 'Magnesium 200 mg', n: { magnesium: 200 } },
+  { name: 'Electrolytes', n: { sodium: 1000, potassium: 200, magnesium: 60 } },
   { name: 'Vitamin B12 1,000 µg', n: { b12: 1000 } },
   { name: 'Vitamin C 500 mg', n: { vitC: 500 } },
-  { name: 'Magnesium 200 mg', n: { magnesium: 200 } },
-  { name: 'Iron 18 mg', n: { iron: 18 } },
   { name: 'Zinc 15 mg', n: { zinc: 15 } },
+  { name: 'Iron 18 mg', n: { iron: 18 } },
   { name: 'Calcium 500 mg', n: { calcium: 500 } },
+  { name: 'Biotin', extra: [{ name: 'Biotin', amount: 5000, unit: 'µg' }] },
+  { name: 'Ashwagandha', extra: [{ name: 'Ashwagandha root extract', amount: 600, unit: 'mg' }] },
+  { name: 'Probiotic', extra: [{ name: 'Probiotic cultures', amount: 10, unit: 'billion CFU' }] },
 ];
+
+// Ingredients without a target (creatine, EPA, biotin…) from the supplements ticked off on a day.
+export function suppExtras(day, supplements = []) {
+  const by = new Map();
+  for (const id of day?.supps || []) {
+    const sp = supplements.find((x) => x.id === id);
+    for (const x of sp?.extra || []) {
+      const key = `${x.name.toLowerCase()}|${x.unit}`;
+      const cur = by.get(key) || { name: x.name, unit: x.unit, amount: 0, from: [] };
+      cur.amount += +x.amount || 0;
+      cur.from.push(sp.name);
+      by.set(key, cur);
+    }
+  }
+  return [...by.values()];
+}
