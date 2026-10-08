@@ -1,0 +1,88 @@
+import { html, render, useState, useEffect } from './vendor/preact.js';
+import { useStore, loadState, state, emit, dateKey as todayKey } from './store.js';
+import { Icon, Toast } from './ui.js';
+import { loadFoods } from './foods.js';
+import { Today, EntrySheet } from './views/today.js';
+import { AddSheet } from './views/add.js';
+import { NutrientsView, NutrientSheet } from './views/nutrients.js';
+import { SettingsView } from './views/settings.js';
+import { Onboarding } from './views/onboarding.js';
+
+function App() {
+  const s = useStore();
+  const [tab, setTab] = useState('today');
+  const [lastTab, setLastTab] = useState('today');
+  const [day, setDay] = useState(todayKey());
+  const [sheet, setSheet] = useState(null);
+  const [section, setSection] = useState(null);
+
+  // Roll over to the new day if the app stays open past midnight.
+  useEffect(() => {
+    let last = todayKey();
+    const check = () => {
+      const now = todayKey();
+      if (now !== last) { setDay((cur) => (cur === last ? now : cur)); last = now; }
+    };
+    document.addEventListener('visibilitychange', check);
+    const timer = setInterval(check, 60000);
+    return () => { document.removeEventListener('visibilitychange', check); clearInterval(timer); };
+  }, []);
+
+  // Warm up the food database in the background so search is instant.
+  useEffect(() => {
+    if (s.ready && s.profile) (window.requestIdleCallback || setTimeout)(() => loadFoods().catch(() => {}));
+  }, [s.ready, !!s.profile]);
+
+  if (!s.ready) return html`<div class="boot" />`;
+  if (!s.profile) return html`<${Onboarding} />`;
+
+  const go = (next, toSection = null) => {
+    if (next === 'back') setTab(lastTab);
+    else {
+      if (tab !== 'settings') setLastTab(tab);
+      setTab(next);
+    }
+    setSection(toSection);
+    window.scrollTo(0, 0);
+  };
+  const closeSheet = (which) => () => setSheet((cur) => (cur === which ? null : cur));
+
+  return html`
+    <main class="app">
+      ${tab === 'today' && html`<${Today} dateKey=${day} setDateKey=${setDay} openSheet=${setSheet} go=${go} />`}
+      ${tab === 'nutrients' && html`<${NutrientsView} dateKey=${day} openSheet=${setSheet} go=${go} />`}
+      ${tab === 'settings' && html`<${SettingsView} go=${go} section=${section} />`}
+    </main>
+
+    ${tab !== 'settings' && html`
+      <nav class="tabbar" aria-label="Main">
+        <button type="button" class="tab ${tab === 'today' ? 'on' : ''}" onClick=${() => go('today')} aria-current=${tab === 'today' ? 'page' : null}>
+          <${Icon} name="ring" size=${24} /><span>Today</span>
+        </button>
+        <button type="button" class="tab-add" onClick=${() => setSheet({ type: 'add' })} aria-label="Add food">
+          <${Icon} name="plus" size=${28} stroke=${2.2} />
+        </button>
+        <button type="button" class="tab ${tab === 'nutrients' ? 'on' : ''}" onClick=${() => go('nutrients')} aria-current=${tab === 'nutrients' ? 'page' : null}>
+          <${Icon} name="leaf" size=${24} /><span>Nutrients</span>
+        </button>
+      </nav>`}
+
+    ${sheet?.type === 'add' && html`
+      <${AddSheet} key=${sheet.query || 'add'} dateKey=${day} meal=${sheet.meal} mode=${sheet.mode} query=${sheet.query}
+        onClose=${closeSheet(sheet)} toSettings=${() => { setSheet(null); go('settings', 'ai'); }} />`}
+    ${sheet?.type === 'entry' && html`<${EntrySheet} dateKey=${day} id=${sheet.id} onClose=${closeSheet(sheet)} />`}
+    ${sheet?.type === 'nutrient' && html`
+      <${NutrientSheet} nkey=${sheet.key} dateKey=${day} onClose=${closeSheet(sheet)}
+        onSearch=${(q) => setSheet({ type: 'add', mode: 'search', query: q })} />`}
+
+    <${Toast} toast=${s.toast} onDismiss=${() => { state.toast = null; emit(); }} />
+  `;
+}
+
+render(html`<${App} />`, document.getElementById('root'));
+loadState();
+
+const local = ['localhost', '127.0.0.1'].includes(location.hostname);
+if ('serviceWorker' in navigator && !local) {
+  navigator.serviceWorker.register('./sw.js').catch((err) => console.warn('Offline mode unavailable', err));
+}

@@ -1,0 +1,67 @@
+# Plate
+
+A calm, private calorie tracker for your phone. It tracks calories, macros, water and 18 vitamins and minerals, and suggests what to eat when you're running low. It's free, with no account, no subscription and no ads.
+
+**Open it:** https://maronov-r.github.io/Calorie-Tracking-/
+
+## Install on iPhone
+
+1. Open the link above in **Safari**.
+2. Tap **Share**, then **Add to Home Screen**.
+3. Open Plate from your home screen. It runs full-screen and works offline.
+
+## What it does
+
+- **Today:** a calorie ring, protein/carbs/fat bars, tap-a-drop water tracking, and a grid of vitamin and mineral rings.
+- **Three ways to log food:**
+  - **Search** about 7,800 everyday foods from the USDA with full vitamin and mineral data. It works offline.
+  - **Scan** a barcode on packaged food (via Open Food Facts).
+  - **Describe** a meal in words or snap a photo, and Claude estimates it (needs your own API key, see below).
+- **Nutrients:** see today or a 7-day average against the U.S. Recommended Dietary Allowances for your age and sex. Tap any nutrient to see where yours came from and which foods are good sources.
+- **Supplements:** add what you take once, then tick it off each day. It counts toward your totals.
+- **Targets** are calculated from your age, sex, height, weight, activity level and goal (Mifflin–St Jeor). You can override any of them.
+- **Themes:** Oat (default), Midnight and Porcelain. Change them in Settings.
+
+## AI logging (optional)
+
+Describing meals and photo logging use Claude through your own Anthropic API key. You pay Anthropic per use, with no subscription:
+
+| Model | Roughly per log |
+|---|---|
+| Claude Opus 5.5 (default, most accurate) | ~3¢ |
+| Claude Sonnet 5.5 | ~1.5¢ |
+| Claude Haiku 5.5 | under 0.1¢ |
+
+Get a key at [console.anthropic.com](https://console.anthropic.com/settings/keys), then paste it into **Settings → AI food logging**. The key is stored only on your phone and only ever sent to Anthropic.
+
+## Your data
+
+Everything lives in your phone's browser storage (IndexedDB). Nothing is uploaded anywhere. Use **Settings → Export backup** now and then, and save the file to Files or iCloud Drive. **Restore from backup** brings it back on a new phone.
+
+## How it's built
+
+A static web app with no build step, served by GitHub Pages.
+
+```
+index.html, sw.js, manifest.webmanifest   app shell, offline cache, install metadata
+css/app.css                               all styles and the three themes
+js/app.js                                 tabs, sheets, startup
+js/store.js                               state + IndexedDB persistence
+js/nutrients.js                           nutrient list, RDAs, targets, formatting
+js/foods.js                               local food search
+js/off.js                                 Open Food Facts barcode lookup
+js/ai.js                                  Claude meal estimates
+js/views/*                                screens
+js/vendor/*                               Preact + htm, Anthropic SDK, barcode scanner (bundled)
+data/foods.json                           USDA SR Legacy, trimmed to 26 nutrients
+```
+
+To run it locally, serve the folder with any static server (for example `npx serve .`) and open it in a browser.
+
+### Data sources
+
+- USDA FoodData Central, SR Legacy (public domain)
+- Open Food Facts (Open Database License)
+- U.S. Dietary Reference Intakes (NIH Office of Dietary Supplements)
+
+Plate gives estimates, not medical advice.
