@@ -1,7 +1,7 @@
 // Demo of the pay-as-you-go AI coach: fake credit, a pretend checkout and built-in answers.
 // Only active on the demo page (demo/index.html sets PLATE_DEMO). No money, no server, no API key.
 import { state, setWallet, getTargets, styleOn, totalsFor, toast, dateKey as todayKey } from './store.js';
-import { computeTargets, styleFor, goalFor, STYLES } from './nutrients.js';
+import { computeTargets, styleFor, goalFor, paceFor, experienceFor, normalizeProfile, STYLES, KG_PER_LB } from './nutrients.js';
 import { goalGuide, styleGuide, planWhy, proteinIdeas, calorieCheck, coachLine } from './coach.js';
 import { foodByName } from './foods.js';
 
@@ -95,9 +95,11 @@ export async function demoReply(question) {
     );
   }
 
+  if (has(q, /how long|how fast|how soon|when will|how many (weeks|months)|timeline/)) return out(timeline(normalizeProfile(p), units));
+
   const goalAsked = has(q, /recomp|both|lose fat and build|lose fat \+ build/) ? 'recomp'
     : has(q, /bulk|build muscle|gain|bigger/) ? 'lean_bulk'
-    : has(q, /lose|cut|fat loss|lean out|shred/) ? 'cut'
+    : has(q, /lose|losing|loss|cut|lean out|shred|slim/) ? 'cut'
     : has(q, /maintain/) ? 'maintain' : null;
   if (goalAsked) {
     const tt = computeTargets({ ...p, goal: goalAsked, adjust: goalAsked === p.goal ? p.adjust : 0 }, ov, style);
@@ -121,6 +123,34 @@ export async function demoReply(question) {
     coachLine(),
     'In this demo I answer from Plate\'s built-in guide, so try asking about **protein**, **keto or low carb**, **bulking or losing fat**, **your pace** or **your plan**. The real coach can answer any question.',
   ]);
+}
+
+// How long a goal takes, from the healthy weekly pace for this person.
+function timeline(p, units) {
+  const g = goalFor(p.goal);
+  const metric = units === 'metric';
+  const unit = metric ? 'kg' : 'lb';
+  const amt = metric ? 5 : 10;
+  // The weekly change the chosen pace aims for: % of bodyweight when losing, experience-based when gaining.
+  const kgWeek = g.value === 'cut' ? p.weightKg * paceFor(p.pace).cut / 100
+    : g.value === 'lean_bulk' ? p.weightKg * experienceFor(p.experience).gainPct * paceFor(p.pace).gain / 100 / 4.33 : 0;
+  if (kgWeek > 0 && !(p.pregnant && g.dir < 0)) {
+    const rate = metric ? kgWeek : kgWeek / KG_PER_LB;
+    const weeks = (n) => Math.round(n / rate);
+    return [
+      `At your ${paceFor(p.pace).label.toLowerCase()} pace you'd ${g.dir < 0 ? 'lose' : 'gain'} about **${rate.toFixed(1)} ${unit} a week**. So ${amt} ${unit} takes about **${weeks(amt)} weeks**, and ${amt * 2} ${unit} about ${weeks(amt * 2)} weeks.`,
+      g.dir < 0
+        ? 'The first week or two often drops faster because of water, then it settles. Real weeks bounce around, so judge by your trend after two weeks of weigh-ins.'
+        : 'Gaining faster than that is mostly fat. Judge by your trend after two weeks of weigh-ins.',
+    ];
+  }
+  if (g.value === 'recomp') {
+    return [
+      'When you lose fat and build muscle together, the scale is a slow clock: muscle added hides some of the fat lost.',
+      'Most beginners lifting 3 times a week and hitting protein get noticeably stronger in the first month and see a clear change in the mirror and their waist in **8 to 12 weeks**. Take a photo and a waist measurement now so you can compare.',
+    ];
+  }
+  return ['On maintain there’s no finish line: your weight holds steady while you get stronger. Most people notice strength gains within a few weeks of regular lifting.'];
 }
 
 // What one demo answer costs: a little more when it looks foods up.

@@ -97,11 +97,11 @@ export function CreditCard({ openSheet }) {
           ${PACKS.map((x) => {
             const m = split(x);
             return html`<div class="owner-row">
-              <b>${x.label} top-up</b>
-              <span>Apple or Google −${fmtMoney(m.fee)} · AI −${fmtMoney(m.ai)} · <b class="keep">you keep ${fmtMoney(m.keep)}</b></span>
+              <b>${x.label} top-up: they get about ${questionsFor(x.credit)} questions</b>
+              <span>Apple or Google take ${fmtMoney(m.fee)} · the AI bill for those questions is ${fmtMoney(m.ai)} · <b class="keep">you keep ${fmtMoney(m.keep)}</b></span>
             </div>`;
           })}
-          <p class="fine">Once it's all used. Free starter credit costs you about ${fmtCents(Math.round(STARTER_CENTS * AI_SHARE))} per person who tries the coach.</p>
+          <p class="fine">Each question costs the user about 3.5¢ and costs you about 2¢ in AI. Free starter credit costs you about ${fmtCents(Math.round(STARTER_CENTS * AI_SHARE))} per person who tries the coach.</p>
         </div>`}
 
       <p class="list-label">Demo tools</p>

@@ -1440,7 +1440,7 @@ svg { flex-shrink: 0; }
 .btn-pay { background: var(--ink); color: var(--bg); }
 .cost-line { margin: 8px 0 0; font-size: 12px; color: var(--ink-3); }
 .low-credit {
-  display: flex; justify-content: center; gap: 8px; padding: 8px 12px; font-size: 13.5px;
+  display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 12px 8px 16px; font-size: 14px;
   background: var(--accent-soft); border-top: 1px solid var(--line);
 }
 .chat-lock {

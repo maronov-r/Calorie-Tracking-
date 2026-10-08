@@ -307,7 +307,7 @@ function Coach({ close, toSettings }) {
       ${error && html`<p class="error center">${error}</p>`}
     </div>
     ${DEMO && view === 'chat' && credit > 0 && credit <= LOW_CENTS && html`
-      <div class="low-credit">Running low: ${fmtCents(credit)} left <button type="button" class="link" onClick=${() => setView('topup')}>Add credit</button></div>`}
+      <div class="low-credit"><span><b>Running low:</b> ${fmtCents(credit)} left</span><button type="button" class="chip chip-accent" onClick=${() => setView('topup')}>Add credit</button></div>`}
     ${DEMO && view === 'chat' && credit <= 0 && html`
       <div class="chat-lock">
         <b>You're out of coach credit</b>
