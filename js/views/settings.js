@@ -9,6 +9,7 @@ import { suppSummary } from './supplements.js';
 import { AI_MODELS } from '../ai.js';
 import { DEMO } from '../demo.js';
 import { CreditCard } from './credit.js';
+import { AiCostCard } from './costs.js';
 
 
 // Profile inputs, shared by onboarding and settings. Calls onChange only with valid values.
@@ -198,6 +199,7 @@ export function SettingsView({ go, section, openSheet }) {
         <${ChoiceList} options=${AI_MODELS.map((m) => ({ value: m.id, label: m.label, hint: m.hint }))} value=${s.settings.model} onChange=${(v) => setSettings({ model: v })} />
       </div>
     </section>`}
+    ${!DEMO && html`<${AiCostCard} />`}
 
     <section class="card set-section">
       <h2 class="card-title">Supplements</h2>

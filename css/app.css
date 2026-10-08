@@ -1460,3 +1460,11 @@ svg { flex-shrink: 0; }
 .owner-row span { color: var(--ink-2); }
 .owner-row .keep { color: var(--good); }
 .owner .fine { margin: 0; }
+
+/* ============ AI cost meter ============ */
+.cost-rows > div { align-items: flex-start; }
+.cost-rows small { display: block; font-size: 12px; color: var(--ink-3); line-height: 1.4; margin-top: 2px; }
+.cost-rows b { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.cost-rows b small { text-align: right; font-weight: 400; }
+.cost-verdict { margin: 0; padding: 10px 12px; border-radius: 12px; font-size: 14px; line-height: 1.45; background: var(--accent-soft); }
+.cost-verdict.bad { background: color-mix(in srgb, var(--low) 14%, transparent); }

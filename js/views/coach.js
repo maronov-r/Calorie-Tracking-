@@ -1,13 +1,13 @@
 import { html, useState, useRef, useEffect } from '../vendor/preact.js';
 import {
-  useStore, state, getTargets, updatePlan, setStyle, setSettings, setProfile, setCoach, toast, totalsFor, addEntries, mealForNow, mealLabel,
+  useStore, state, getTargets, logAiCost, updatePlan, setStyle, setSettings, setProfile, setCoach, toast, totalsFor, addEntries, mealForNow, mealLabel,
   dateKey as todayKey,
 } from '../store.js';
 import { Icon, Sheet, Segmented, Empty } from '../ui.js';
 import { GOALS, PACES, STYLES, FOCUS, computeTargets, goalFor, styleFor, fmtKcal, fmtNum, focusFor, directionOf, macroLabel } from '../nutrients.js';
 import { goalGuide, styleGuide, planSteps, coachContext, lookUpFoods, resolveMeal, COACH_GOALS, COACH_STYLES } from '../coach.js';
 import { loadFoods, foodsReady, makeEntry, fullName } from '../foods.js';
-import { askCoach, aiErrorMessage } from '../ai.js';
+import { askCoach, aiErrorMessage, fmtAiCents } from '../ai.js';
 import { ChoiceList } from './settings.js';
 import { DEMO, wallet, charge, demoReply, replyCost, fmtMoney, fmtCents, LOW_CENTS } from '../demo.js';
 import { PrivacyPane, TopUp } from './credit.js';
@@ -240,7 +240,8 @@ function Coach({ close, toSettings }) {
         ? await demoReply(question)
         : await askCoach({ apiKey: s.settings.apiKey, model: s.settings.model, history: recent.map(withMeals), context: coachContext(), runTool });
       const cost = DEMO ? charge(replyCost(res), 'Coach answer') : undefined;
-      setCoach([...state.coach, { role: 'assistant', text: res.reply || res.text || 'Sorry, I lost my train of thought. Ask me again?', meals: res.meals, actions: res.actions, cost, t: Date.now() }]);
+      if (!DEMO) logAiCost('coach', res.cost);
+      setCoach([...state.coach, { role: 'assistant', text: res.reply || res.text || 'Sorry, I lost my train of thought. Ask me again?', meals: res.meals, actions: res.actions, cost, aiCents: res.cost?.cents, t: Date.now() }]);
     } catch (err) {
       setCoach(state.coach.slice(0, -1)); // drop the unanswered question so the chat stays in turn
       setText(question);
@@ -302,6 +303,7 @@ function Coach({ close, toSettings }) {
                   : html`<button type="button" class="chip chip-accent" onClick=${() => tapAction(mi, ai)}>${a.label}</button>`))}
               </div>`}
             ${m.cost != null && html`<p class="cost-line">This answer used ${fmtCents(m.cost)}</p>`}
+            ${m.aiCents != null && html`<p class="cost-line">This answer cost you ${fmtAiCents(m.aiCents)} in AI</p>`}
           </div>`))}
       ${busy && html`<div class="bubble coach typing" aria-label="Coach is typing"><i /><i /><i /></div>`}
       ${error && html`<p class="error center">${error}</p>`}

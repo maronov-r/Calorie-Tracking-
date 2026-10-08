@@ -1,6 +1,6 @@
 import { html, useState, useEffect, useMemo, useRef } from '../vendor/preact.js';
 import {
-  useStore, MEALS, mealLabel, mealForNow, addEntries, pushRecent, saveCustomFood, getTargets, toast,
+  useStore, MEALS, mealLabel, mealForNow, addEntries, pushRecent, saveCustomFood, getTargets, toast, logAiCost,
 } from '../store.js';
 import { Icon, Sheet, Segmented, Stepper, NumberInput, NutritionSummary, Empty } from '../ui.js';
 import {
@@ -248,6 +248,7 @@ function AiPane({ initialText, onLog, toSettings }) {
     setErr('');
     try {
       const out = await estimateMeal({ apiKey: s.settings.apiKey, model: model.id, text, imageB64: photo?.b64 });
+      logAiCost('meal', out.cost);
       setRes({ note: out.note, items: out.items.map((it) => ({ food: aiFood(it), portion: it.portion, mult: 1, on: true })) });
     } catch (x) {
       setErr(aiErrorMessage(x));

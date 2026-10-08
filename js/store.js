@@ -38,6 +38,7 @@ export const state = {
   customFoods: [],
   coach: [], // chat with the AI coach: { role, text, actions?, t }
   wallet: null, // demo only: pretend coach credit
+  aiLog: [], // cost of each AI call: { t, kind, model, cents, in, out, cacheRead, cacheWrite, steps }. No content.
   toast: null,
 };
 
@@ -76,6 +77,7 @@ export async function loadState() {
       else if (k === 'customFoods') state.customFoods = v;
       else if (k === 'coach') state.coach = v;
       else if (k === 'wallet') state.wallet = v;
+      else if (k === 'aiLog') state.aiLog = v;
     }
   } catch (err) {
     console.warn('Storage unavailable', err);
@@ -262,6 +264,18 @@ export function setCoach(messages) {
 }
 
 // ---- Recents, supplements, custom foods ----
+
+export function logAiCost(kind, cost) {
+  if (!cost) return;
+  state.aiLog = [{ t: Date.now(), kind, ...cost }, ...state.aiLog].slice(0, 300);
+  persist('aiLog', state.aiLog);
+  emit();
+}
+export function clearAiLog() {
+  state.aiLog = [];
+  persist('aiLog', []);
+  emit();
+}
 
 export function setWallet(w) {
   state.wallet = w;

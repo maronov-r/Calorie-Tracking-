@@ -6,6 +6,31 @@ export const AI_MODELS = [
   { id: 'claude-haiku-5-5', label: 'Claude Haiku 5.5', hint: 'Cheapest · under 0.1¢ per log' },
 ];
 
+// Dollars per million tokens (Claude API pricing). Cache writes cost 1.25× input; cache reads are the cheap repeat rate.
+const PRICES = {
+  'claude-opus-5-5': { in: 4, out: 20, cacheRead: 0.2 },
+  'claude-sonnet-5-5': { in: 2, out: 10, cacheRead: 0.2 },
+  'claude-haiku-5-5': { in: 0.1, out: 0.5, cacheRead: 0.01 },
+};
+
+// Adds one response's tokens and cost (in cents) to a running total. Output tokens include the model's thinking.
+function addUsage(total, msg, fallbackModel) {
+  const u = msg.usage || {};
+  const price = PRICES[msg.model] || PRICES[fallbackModel] || PRICES['claude-opus-5-5'];
+  const t = {
+    in: u.input_tokens || 0, out: u.output_tokens || 0,
+    cacheWrite: u.cache_creation_input_tokens || 0, cacheRead: u.cache_read_input_tokens || 0,
+  };
+  const dollars = (t.in * price.in + t.cacheWrite * price.in * 1.25 + t.cacheRead * price.cacheRead + t.out * price.out) / 1e6;
+  return {
+    model: msg.model || fallbackModel,
+    steps: (total?.steps || 0) + 1,
+    cents: (total?.cents || 0) + dollars * 100,
+    in: (total?.in || 0) + t.in, out: (total?.out || 0) + t.out,
+    cacheWrite: (total?.cacheWrite || 0) + t.cacheWrite, cacheRead: (total?.cacheRead || 0) + t.cacheRead,
+  };
+}
+
 // Field names spell out units so the model never has to guess them.
 const FIELDS = {
   kcal: 'calories_kcal', protein: 'protein_g', carbs: 'carbs_g', fat: 'fat_g', fiber: 'fiber_g', sugar: 'sugar_g',
@@ -77,6 +102,7 @@ export async function estimateMeal({ apiKey, model, text, imageB64 }) {
     ? await client.messages.create(params)
     : await client.beta.messages.create({ ...params, betas: ['server-side-fallback-2026-07-01'], fallbacks: 'default' });
 
+  const cost = addUsage(null, msg, model);
   if (msg.stop_reason === 'refusal') throw new AiError('Claude declined to estimate this one. Try describing it differently.');
   if (msg.stop_reason === 'max_tokens') throw new AiError('The answer got cut off. Try fewer foods at once.');
   const block = msg.content.find((b) => b.type === 'text');
@@ -85,6 +111,7 @@ export async function estimateMeal({ apiKey, model, text, imageB64 }) {
   let data;
   try { data = JSON.parse(block.text); } catch { throw new AiError('The estimate came back garbled. Try again.'); }
   return {
+    cost,
     note: data.note || '',
     items: (data.items || []).map((it) => {
       const out = { name: it.name, portion: it.portion, grams: Math.max(0, +it.grams || 0) };
@@ -145,6 +172,7 @@ export async function readSupplementLabel({ apiKey, model, imageB64 }) {
   const msg = model === 'claude-haiku-5-5'
     ? await client.messages.create(params)
     : await client.beta.messages.create({ ...params, betas: ['server-side-fallback-2026-07-01'], fallbacks: 'default' });
+  const cost = addUsage(null, msg, model);
   if (msg.stop_reason === 'refusal') throw new AiError("Claude couldn't read this one. Try typing it in.");
   if (msg.stop_reason === 'max_tokens') throw new AiError('The answer got cut off. Try a closer photo of just the facts panel.');
   const block = msg.content.find((b) => b.type === 'text');
@@ -158,7 +186,7 @@ export async function readSupplementLabel({ apiKey, model, imageB64 }) {
   }
   const extra = (data.other || []).filter((x) => x.name && +x.amount > 0).map((x) => ({ name: x.name, amount: +x.amount, unit: x.unit }));
   if (!Object.keys(n).length && !extra.length) throw new AiError(data.note || "Couldn't find any amounts on that label. Try a closer, sharper photo of the facts panel.");
-  return { name: String(data.name || '').trim(), n, extra, note: data.note || '' };
+  return { name: String(data.name || '').trim(), n, extra, note: data.note || '', cost };
 }
 
 // ---- Coach chat ----
@@ -270,6 +298,7 @@ const MAX_STEPS = 6;
 export async function askCoach({ apiKey, model, history, context, runTool }) {
   const client = await getClient(apiKey);
   const messages = history.map((m) => ({ role: m.role, content: m.text }));
+  let cost = null;
   for (let step = 0; step < MAX_STEPS; step++) {
     // Standard endpoint, no server-side fallback: switching models partway through a tool loop isn't safe.
     const msg = await client.messages.create({
@@ -280,6 +309,7 @@ export async function askCoach({ apiKey, model, history, context, runTool }) {
       messages,
       output_config: { effort: 'medium', format: { type: 'json_schema', schema: COACH_SCHEMA } },
     });
+    cost = addUsage(cost, msg, model);
     if (msg.stop_reason === 'refusal') throw new AiError("The coach can't help with that one. Try asking another way.");
     if (msg.stop_reason === 'max_tokens') throw new AiError('The answer got cut off. Try a narrower question.');
     if (msg.stop_reason === 'tool_use') {
@@ -304,10 +334,13 @@ export async function askCoach({ apiKey, model, history, context, runTool }) {
       reply: String(data.reply || '').trim(),
       meals: Array.isArray(data.meals) ? data.meals : [],
       actions: Array.isArray(data.actions) ? data.actions : [],
+      cost,
     };
   }
   throw new AiError('The coach took too many steps on that one. Try a simpler question.');
 }
+
+export const fmtAiCents = (c) => (c < 0.1 ? '<0.1¢' : c < 10 ? `${c.toFixed(1)}¢` : `${Math.round(c)}¢`);
 
 export function aiErrorMessage(err) {
   if (err instanceof AiError) return err.message;

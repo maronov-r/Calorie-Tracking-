@@ -1,5 +1,5 @@
 import { html, useState, useRef } from '../vendor/preact.js';
-import { useStore, saveSupplement, deleteSupplement } from '../store.js';
+import { useStore, saveSupplement, deleteSupplement, logAiCost } from '../store.js';
 import { Icon, Sheet, NumberInput } from '../ui.js';
 import { N, SUPP_FIELDS, SUPP_PRESETS, fmtNum } from '../nutrients.js';
 import { readSupplementLabel, prepareImage, aiErrorMessage } from '../ai.js';
@@ -56,6 +56,7 @@ function SupplementForm({ supp, close, toSettings }) {
       const img = await prepareImage(file);
       setScan((x) => ({ ...x, photo: img.dataUrl }));
       const res = await readSupplementLabel({ apiKey: s.settings.apiKey, model: s.settings.model, imageB64: img.b64 });
+      logAiCost('label', res.cost);
       if (res.name) setName(res.name);
       setN(res.n);
       setExtra(res.extra);
