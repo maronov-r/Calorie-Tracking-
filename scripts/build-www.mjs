@@ -45,4 +45,34 @@ const iconNote = 'Applies on the App Store version. Here it changes the browser 
 let sp = fs.readFileSync(spJs, 'utf8');
 if (!sp.includes(iconNote)) throw new Error('js/views/supporter.js: app icon note not found');
 fs.writeFileSync(spJs, sp.replace(iconNote, 'Changes your home screen icon.'));
+
+// Early-access wording for the app: no "test version / pretend money" lines. Credit and unlocks are free for testers,
+// so the app says that plainly instead. (The website's /beta page keeps its own wording.)
+const wording = {
+  'js/app.js': [
+    ['${BETA && html`<div class="demo-ribbon">Test version · real AI, pretend money</div>`}', ''],
+  ],
+  'js/views/credit.js': [
+    ["'This is a test version: answers come from the real AI through your Plate server, and credit is pretend.'", "'Answers come from the real AI through the Plate server.'"],
+    ['html`<span class="spinner" /> Paying…`', 'html`<span class="spinner" /> Adding…`'],
+    ['`Pay ${fmtMoney(pack.value)}`', '`Add ${fmtMoney(pack.credit)}`'],
+    ["Demo: no real money. In the real app this opens Apple's or Google's payment screen.", 'Free during early access. No card needed.'],
+  ],
+  'js/demo.js': [
+    ['of test credit`', 'of credit`'],
+  ],
+  'js/views/supporter.js': [
+    ["'Thank you for supporting Plate! (Pretend unlock, no money moved.)'", "'Thank you for supporting Plate!'"],
+    ['Undo pretend unlock', 'Undo unlock'],
+    ['Test version: unlocking is pretend and no money moves.', 'Free during early access.'],
+  ],
+};
+for (const [file, swaps] of Object.entries(wording)) {
+  let src = fs.readFileSync(`${out}/${file}`, 'utf8');
+  for (const [from, to] of swaps) {
+    if (!src.includes(from)) throw new Error(`${file}: wording not found: ${from}`);
+    src = src.replace(from, to);
+  }
+  fs.writeFileSync(`${out}/${file}`, src);
+}
 console.log('www/ ready');
