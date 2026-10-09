@@ -4,7 +4,7 @@ import { useStore, eraseAll, toast } from '../store.js';
 import { Icon, Sheet } from '../ui.js';
 import { coachContext } from '../coach.js';
 import {
-  BETA, deleteServerAccount, wallet, addCredit, markPrivacySeen, setDemoBalance, split, fmtMoney, fmtCents, questionsFor, PACKS, STARTER_CENTS, PRICE_CENTS, AI_COST_CENTS, LEAN_AI_COST_CENTS,
+  BETA, TIERS, currentTier, setTier, tierPriceText, markupNow, deleteServerAccount, wallet, addCredit, markPrivacySeen, setDemoBalance, split, fmtMoney, fmtCents, questionsFor, PACKS, STARTER_CENTS, PRICE_CENTS, AI_COST_CENTS, LEAN_AI_COST_CENTS,
 } from '../demo.js';
 import { ChoiceList } from './settings.js';
 
@@ -86,6 +86,10 @@ export function CreditCard({ openSheet }) {
       </div>
       <button type="button" class="btn btn-primary btn-block" onClick=${() => openSheet({ type: 'topup' })}><${Icon} name="plus" size=${18} /> Add credit</button>
       <p class="fine">Plate is free. Only the AI coach uses credit, a few cents a question. Your data stays on this phone.</p>
+      ${BETA && html`
+        <p class="list-label">Coach quality</p>
+        <${ChoiceList} options=${TIERS.map((t) => ({ value: t.value, label: t.label, hint: `${tierPriceText(t)}${t.value === 'best' ? ' · most detailed, uses credit about 3× faster' : ' · great for almost everything'}` }))}
+          value=${currentTier().value} onChange=${setTier} />`}
 
       ${w.log.length > 0 && html`
         <p class="list-label">Recent</p>
@@ -101,10 +105,10 @@ export function CreditCard({ openSheet }) {
             return html`<div class="owner-row">
               <b>${x.label} top-up: they get about ${questionsFor(x.credit)} questions</b>
               <span>Apple or Google take ${fmtMoney(m.fee)} · the AI bill for those questions is ${fmtMoney(m.ai)} · <b class="keep">you keep ${fmtMoney(m.keep)}</b></span>
-              <span>If you get the AI cost down to ${LEAN_AI_COST_CENTS}¢: <b class="keep">you keep ${fmtMoney(m.keepLean)}</b></span>
+              ${!BETA && html`<span>If you get the AI cost down to ${LEAN_AI_COST_CENTS}¢: <b class="keep">you keep ${fmtMoney(m.keepLean)}</b></span>`}
             </div>`;
           })}
-          <p class="fine">Every question is ${PRICE_CENTS}¢ for the user and about ${AI_COST_CENTS}¢ for you in AI. The free starter credit (${STARTER_CENTS / PRICE_CENTS} questions) costs you about ${fmtCents(STARTER_CENTS / PRICE_CENTS * AI_COST_CENTS)} per person who tries the coach.</p>
+          ${BETA ? html`<p class="fine">People pay what the AI costs × ${markupNow()}. Question counts are for ${currentTier().label}. The free ${fmtCents(STARTER_CENTS)} starter credit costs you about ${fmtCents(STARTER_CENTS / markupNow())} per person who tries the coach.</p>` : html`<p class="fine">Every question is ${PRICE_CENTS}¢ for the user and about ${AI_COST_CENTS}¢ for you in AI. The free starter credit (${STARTER_CENTS / PRICE_CENTS} questions) costs you about ${fmtCents(STARTER_CENTS / PRICE_CENTS * AI_COST_CENTS)} per person who tries the coach.</p>`}
         </div>`}
 
       <p class="list-label">Demo tools</p>

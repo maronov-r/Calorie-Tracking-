@@ -29,7 +29,7 @@ export const PACKS = [
 export const fmtMoney = (cents) => `$${(Math.max(0, cents) / 100).toFixed(2)}`;
 export const fmtCents = (cents) => (cents < 100 ? `${Number.isInteger(cents) ? cents : cents.toFixed(1)}¢` : fmtMoney(cents));
 export function questionsFor(cents) {
-  const n = cents / PRICE_CENTS;
+  const n = cents / (BETA ? currentTier().avg * markupNow() : PRICE_CENTS);
   return n >= 100 ? Math.round(n / 10) * 10 : Math.max(1, Math.round(n));
 }
 
@@ -80,23 +80,38 @@ async function api(path, init = {}) {
 }
 
 // The phone's account: a random secret the server made, kept like an API key (never exported).
-// Sonnet: close to Opus on coaching and meal plans at about a third of the cost (tested 2026-10-09).
-export const PAID_MODEL = 'claude-sonnet-5-5';
+// Coach quality for paid credit. cost: what one question costs the owner in AI, in cents, from an explaining
+// question to a meal plan; avg: a typical mix. Measured through the server on 2026-10-09.
+// Sonnet came close to Opus on coaching and meal plans at about a third of the cost.
+export const TIERS = [
+  { value: 'standard', label: 'Standard', model: 'claude-sonnet-5-5', cost: [0.6, 2.5], avg: 1.5 },
+  { value: 'best', label: 'Best', model: 'claude-opus-5-5', cost: [1.9, 7.9], avg: 4.5 },
+];
+export const tierFor = (model) => TIERS.find((t) => t.model === model) || TIERS[0];
+export const currentTier = () => tierFor(state.settings.model);
+export const setTier = (value) => setSettings({ model: (TIERS.find((t) => t.value === value) || TIERS[0]).model, tierChosen: true });
+export const markupNow = () => wallet().markup || 2;
+// What a question costs the person on this tier, as "about 1–5¢".
+export function tierPriceText(t) {
+  const [lo, hi] = t.cost.map((c) => c * markupNow());
+  return `About ${lo < 1 ? '<1' : Math.round(lo)}–${Math.round(hi)}¢ a question`;
+}
 
 export async function ensureAccount() {
   if (!BETA) return;
-  if (state.settings.model !== PAID_MODEL) setSettings({ model: PAID_MODEL });
+  // Everyone starts on Standard until they pick for themselves.
+  if (!state.settings.tierChosen && state.settings.model !== TIERS[0].model) setSettings({ model: TIERS[0].model });
   if (state.settings.apiKey?.startsWith('plate_')) return refreshBalance();
   const a = await api('/account', { method: 'POST' });
   setSettings({ apiKey: a.token });
-  setWallet({ ...wallet(), cents: a.balance_cents, log: a.balance_cents ? [{ t: Date.now(), what: 'Free starter credit', cents: a.balance_cents }] : [] });
+  setWallet({ ...wallet(), cents: a.balance_cents, markup: a.markup, log: a.balance_cents ? [{ t: Date.now(), what: 'Free starter credit', cents: a.balance_cents }] : [] });
 }
 
 export async function refreshBalance() {
   if (!BETA || !state.settings.apiKey) return;
   try {
     const a = await api('/account');
-    setWallet({ ...wallet(), cents: a.balance_cents });
+    setWallet({ ...wallet(), cents: a.balance_cents, markup: a.markup });
   } catch (err) {
     if (err.status === 401) { setSettings({ apiKey: '' }); return ensureAccount(); } // account was deleted
   }
@@ -119,6 +134,10 @@ export async function deleteServerAccount() {
 // Where a top-up goes, from the owner's side.
 export function split(pack) {
   const fee = pack.value * STORE_FEE;
+  if (BETA) {
+    const ai = pack.credit / markupNow(); // people pay AI cost × markup, so this much of their credit is the AI bill
+    return { fee, ai, keep: pack.value - fee - ai };
+  }
   const questions = pack.credit / PRICE_CENTS;
   const ai = questions * AI_COST_CENTS;
   return { fee, ai, keep: pack.value - fee - ai, keepLean: pack.value - fee - questions * LEAN_AI_COST_CENTS };

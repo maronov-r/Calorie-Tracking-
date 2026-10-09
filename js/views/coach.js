@@ -9,6 +9,7 @@ import { goalGuide, styleGuide, planSteps, coachContext, lookUpFoods, resolveMea
 import { loadFoods, foodsReady, makeEntry, fullName } from '../foods.js';
 import { askCoach, aiErrorMessage, fmtAiCents } from '../ai.js';
 import { ChoiceList } from './settings.js';
+import { TIERS, currentTier, setTier, tierPriceText } from '../demo.js';
 import { DEMO, BETA, PAID, MIN_CENTS, wallet, charge, demoReply, replyCost, settleUse, ensureAccount, fmtMoney, fmtCents, LOW_CENTS } from '../demo.js';
 import { PrivacyPane, TopUp } from './credit.js';
 
@@ -306,7 +307,7 @@ function Coach({ close, toSettings }) {
                   : html`<button type="button" class="chip chip-accent" onClick=${() => tapAction(mi, ai)}>${a.label}</button>`))}
               </div>`}
             ${m.cost != null && html`<p class="cost-line">This answer used ${fmtCents(m.cost)}</p>`}
-            ${m.aiCents != null && html`<p class="cost-line">This answer cost you ${fmtAiCents(m.aiCents)} in AI</p>`}
+            ${m.aiCents != null && !PAID && html`<p class="cost-line">This answer cost you ${fmtAiCents(m.aiCents)} in AI</p>`}
           </div>`))}
       ${busy && html`<div class="bubble coach typing" aria-label="Coach is typing"><i /><i /><i /></div>`}
       ${error && html`<p class="error center">${error}</p>`}
@@ -318,6 +319,11 @@ function Coach({ close, toSettings }) {
         <b>You're out of coach credit</b>
         <span>Everything else in Plate stays free.</span>
         <button type="button" class="btn btn-primary btn-block" onClick=${() => setView('topup')}>Add credit</button>
+      </div>`}
+    ${BETA && view === 'chat' && !out && html`
+      <div class="tier-bar">
+        <${Segmented} className="seg-sm" options=${TIERS.map((t) => ({ value: t.value, label: t.label }))} value=${currentTier().value} onChange=${setTier} />
+        <span>${tierPriceText(currentTier())}${currentTier().value === 'best' ? ', about 3× the credit' : ''}</span>
       </div>`}
     ${hasKey && view === 'chat' && !out && html`
       <form class="chat-input" onSubmit=${(e) => { e.preventDefault(); send(); }}>
