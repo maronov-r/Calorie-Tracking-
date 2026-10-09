@@ -12,6 +12,8 @@ import { describeAmount } from '../foods.js';
 import { proteinIdeas } from '../coach.js';
 import { WaterCard } from './water.js';
 import { Celebrate } from './supporter.js';
+import { BuddyCard } from './mascot.js';
+import { MASCOT_ON } from '../mascot.js';
 
 const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
@@ -76,6 +78,7 @@ export function Today({ dateKey, setDateKey, openSheet, go }) {
         <button type="button" class="icon-btn sm" onClick=${() => setSettings({ hideInstallHint: true })} aria-label="Dismiss"><${Icon} name="close" size=${16} /></button>
       </div>`}
 
+    ${MASCOT_ON && html`<${BuddyCard} dateKey=${dateKey} totals=${totals} t=${t} water=${day.water || 0} />`}
     <${CalorieCard} totals=${totals} t=${t} profile=${s.profile} isToday=${dateKey === today} openSheet=${openSheet} />
     <${WaterCard} dateKey=${dateKey} ml=${day.water || 0} goal=${t.water} units=${s.settings.units} openSheet=${openSheet} />
     <${MicroCard} totals=${totals} t=${t} week=${week} hasFood=${day.entries.length > 0}
