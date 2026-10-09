@@ -13,7 +13,7 @@ enabled = false
 MARKUP = "2"             # people pay what the AI costs × this
 STARTER_CENTS = "25"     # free credit for a new account
 TEST_MODE = "true"       # allows the pretend "add credit" button; set to "false" before real payments
-ALLOWED_ORIGINS = "https://maronov-r.github.io,http://localhost:5173"
+ALLOWED_ORIGINS = "https://maronov-r.github.io,http://localhost:5173,capacitor://localhost"
 
 [[d1_databases]]
 binding = "DB"

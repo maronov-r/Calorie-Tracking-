@@ -1,0 +1,9 @@
+{
+  "appId": "com.maronov.plate",
+  "appName": "Plate",
+  "webDir": "www",
+  "ios": {
+    "contentInset": "never",
+    "backgroundColor": "#F2EEE6"
+  }
+}
