@@ -305,7 +305,13 @@ export async function askCoach({ apiKey, model, history, context, runTool }) {
     const msg = await client.messages.create({
       model,
       max_tokens: 16000,
-      system: COACH_SYSTEM + context,
+      // Caching: the instructions are the same for every question, and each step of the tool loop
+      // resends everything before it. Cached text costs a fraction of the normal price.
+      system: [
+        { type: 'text', text: COACH_SYSTEM, cache_control: { type: 'ephemeral' } },
+        { type: 'text', text: context },
+      ],
+      cache_control: { type: 'ephemeral' }, // also caches the conversation so far, for the next step
       tools: [LOOKUP_TOOL],
       messages,
       output_config: { effort: 'medium', format: { type: 'json_schema', schema: COACH_SCHEMA } },

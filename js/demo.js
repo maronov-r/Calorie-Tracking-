@@ -80,8 +80,12 @@ async function api(path, init = {}) {
 }
 
 // The phone's account: a random secret the server made, kept like an API key (never exported).
+// Sonnet: close to Opus on coaching and meal plans at about a third of the cost (tested 2026-10-09).
+export const PAID_MODEL = 'claude-sonnet-5-5';
+
 export async function ensureAccount() {
   if (!BETA) return;
+  if (state.settings.model !== PAID_MODEL) setSettings({ model: PAID_MODEL });
   if (state.settings.apiKey?.startsWith('plate_')) return refreshBalance();
   const a = await api('/account', { method: 'POST' });
   setSettings({ apiKey: a.token });
