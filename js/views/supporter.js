@@ -4,6 +4,7 @@ import { useStore, state, setSettings, applyTheme, toast } from '../store.js';
 import { Icon, Segmented } from '../ui.js';
 import { SUPPORTER_ON, PACK_PRICE, PREMIUM_THEMES, APP_ICONS, iconFor, applyIcon } from '../supporter.js';
 import { mascotSvg } from '../mascot.js';
+import { MascotSettings } from './mascot.js';
 
 export const isSupporter = () => SUPPORTER_ON && !!state.settings.supporter;
 
@@ -40,6 +41,7 @@ export function SupporterCard() {
   const [preview, setPreview] = useState(null); // a theme tried on for now, not saved
   const [shownIcon, setShownIcon] = useState(s.settings.appIcon || 'classic');
   const [play, setPlay] = useState(0);
+  const [open, setOpen] = useState(false);
   const icon = iconFor(shownIcon);
   const iconOn = (s.settings.appIcon || 'classic') === icon.value;
 
@@ -69,13 +71,15 @@ export function SupporterCard() {
 
   return html`
     <section class="card set-section supporter" id="supporter">
-      <div class="sp-head">
+      <button type="button" class="sp-head" aria-expanded=${open} aria-controls="sp-body" onClick=${() => { if (open) endPreview(); setOpen(!open); }}>
         <span class="sp-mark"><${Icon} name="heart" size=${22} stroke=${2} /><${Celebrate} trigger=${play} color="var(--accent)" force /></span>
-        <div class="sp-head-text">
-          <h2 class="card-title">Supporter Pack</h2>
-          ${unlocked ? html`<${SupporterBadge} />` : html`<span class="sp-price">${PACK_PRICE} · one time</span>`}
-        </div>
-      </div>
+        <span class="sp-head-text">
+          <span class="card-title">Supporter Pack</span>
+          ${unlocked ? html`<${SupporterBadge} />` : html`<span class="sp-price">Themes, app icons and a buddy · ${PACK_PRICE}</span>`}
+        </span>
+        <span class="sp-chev"><${Icon} name="right" size=${18} stroke=${2} /></span>
+      </button>
+      ${open && html`<div class="sp-body" id="sp-body">
       <p class="sp-pitch">Plate is free and private. If you love it, the Supporter Pack is a one-time way to help keep it going.</p>
       <ul class="sp-perks">
         <li><b>${PREMIUM_THEMES.length} themes</b> made with care</li>
@@ -135,6 +139,8 @@ export function SupporterCard() {
         </div>
       </div>
 
+      ${unlocked && html`<${MascotSettings} />`}
+
       ${unlocked && html`
         <div class="set-row">
           <span>Goal celebrations</span>
@@ -148,5 +154,6 @@ export function SupporterCard() {
         : html`
           <button type="button" class="btn btn-primary btn-block" onClick=${unlock}>Unlock everything · ${PACK_PRICE}</button>
           <p class="fine center">Test version: unlocking is pretend and no money moves.</p>`}
+      </div>`}
     </section>`;
 }

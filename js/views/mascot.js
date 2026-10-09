@@ -101,17 +101,17 @@ export function BuddyPerch({ dateKey, totals, t, water }) {
     </div>`;
 }
 
-// ---- Settings: pick and name the buddy ----
+// ---- Settings (inside the Supporter Pack): pick and name the buddy ----
 
-export function MascotCard() {
+export function MascotSettings() {
   const s = useStore();
   const m = mascotSettings(s.settings);
   const update = (patch) => setSettings({ mascot: { ...mascotSettings(state.settings), ...patch } }); // latest values, so quick changes don't undo each other
   const c = CHARACTERS[m.ch];
   return html`
-    <section class="card set-section" id="mascot">
-      <h2 class="card-title">Your buddy</h2>
-      <p class="fine">A little friend on the Today screen that reacts to your day: it celebrates goals, sips when you log water and gets sleepy at night. Tap it to say hi.</p>
+    <div class="buddy-settings" id="mascot">
+      <p class="group-label">Your buddy</p>
+      <p class="fine">It sits on your calorie card and reacts to your day. Tap it to say hi.</p>
       <${Segmented} options=${[{ value: true, label: 'Show on Today' }, { value: false, label: 'Hide' }]} value=${m.on} onChange=${(v) => update({ on: v })} />
       <div class="buddy-pick" role="group" aria-label="Character">
         ${Object.entries(CHARACTERS).map(([k, ch]) => html`
@@ -130,5 +130,5 @@ export function MascotCard() {
         <input type="text" id="buddy-name" maxlength="16" value=${m.name} placeholder=${c.label} autocomplete="off"
           onInput=${(e) => update({ name: e.currentTarget.value })} />
       </label>
-    </section>`;
+    </div>`;
 }
