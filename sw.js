@@ -1,6 +1,6 @@
 // Offline support. App code comes from the network when it can (so updates show up right away)
 // and from the cache when offline. Big, rarely changing files are served from the cache first.
-const CACHE = 'plate-v13';
+const CACHE = 'plate-v14';
 const SHELL = [
   './',
   './index.html',
@@ -17,6 +17,7 @@ const SHELL = [
   './js/charts.js',
   './js/coach.js',
   './js/demo.js',
+  './js/supporter.js',
   './js/lib/db.js',
   './js/views/today.js',
   './js/views/add.js',
@@ -29,6 +30,7 @@ const SHELL = [
   './js/views/builder.js',
   './js/views/credit.js',
   './js/views/costs.js',
+  './js/views/supporter.js',
   './demo/',
   './beta/',
   './js/views/settings.js',
@@ -38,6 +40,14 @@ const SHELL = [
   './icons/icon-192.png',
   './icons/apple-touch-icon.png',
   './icons/favicon.svg',
+  './icons/supporter/grove.svg',
+  './icons/supporter/tide.svg',
+  './icons/supporter/harvest.svg',
+  './icons/supporter/sunrise.svg',
+  './icons/supporter/lavender.svg',
+  './icons/supporter/ink.svg',
+  './icons/supporter/neon.svg',
+  './icons/supporter/confetti.svg',
 ];
 
 self.addEventListener('install', (e) => {

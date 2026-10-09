@@ -25,6 +25,8 @@ const ICONS = {
   download: P('M12 4v11M7.5 10.5L12 15l4.5-4.5M5 20h14'),
   upload: P('M12 15V4M7.5 8.5L12 4l4.5 4.5M5 20h14'),
   key: html`<circle cx="8" cy="15" r="3.5" /><path d="M10.5 12.5L19 4M16 7l2.5 2.5M14 9l2 2" />`,
+  lock: html`<rect x="5.5" y="10.5" width="13" height="9.5" rx="2.5" /><path d="M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5" />`,
+  heart: P('M12 19.5s-7.5-4.6-7.5-10A4.2 4.2 0 0 1 12 7a4.2 4.2 0 0 1 7.5 2.5c0 5.4-7.5 10-7.5 10z'),
   info: html`<circle cx="12" cy="12" r="8.5" /><path d="M12 11v5M12 7.8v.2" />`,
   share: P('M12 15V4M8 7.5L12 3.5l4 4M6 11H5v9h14v-9h-1'),
   history: P('M4 12a8 8 0 1 0 2.3-5.6M4 4.5V8h3.5M12 8v4.5l3 2'),

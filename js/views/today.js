@@ -11,6 +11,7 @@ import {
 import { describeAmount } from '../foods.js';
 import { proteinIdeas } from '../coach.js';
 import { WaterCard } from './water.js';
+import { Celebrate } from './supporter.js';
 
 const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
@@ -128,6 +129,7 @@ function FocusRing({ k, t, totals, dir, onClick }) {
           ? html`<span class="ring-check" style=${{ color }}><${Icon} name="check" size=${30} stroke=${2.6} /></span><span class="ring-label">${lower} hit</span>`
           : html`<span class="ring-num">${Math.abs(dir === 'max' ? Math.floor(left) : Math.ceil(left))}<small>g</small></span>
               <span class="ring-label">${lower} ${over ? 'over' : dir === 'max' ? 'left' : 'to go'}</span>`}
+        <${Celebrate} trigger=${done} color=${color} />
       <//>
       <span class="duo-cap"><b>${Math.round(v)}</b> / ${dir === 'max' ? 'max ' : ''}${t[k]} g ${lower}</span>
     </button>`;

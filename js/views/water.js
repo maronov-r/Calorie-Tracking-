@@ -2,6 +2,7 @@ import { html, useState } from '../vendor/preact.js';
 import { useStore, setWater, getDay, getBottles, saveBottles, getTargets, toast, uid } from '../store.js';
 import { Icon, Sheet, NumberInput } from '../ui.js';
 import { fmtWater, ML_PER_OZ } from '../nutrients.js';
+import { Celebrate } from './supporter.js';
 
 // Common bottles, so "my Stanley" is one tap to set up.
 const PRESETS = [
@@ -53,6 +54,7 @@ export function WaterCard({ dateKey, ml, goal, units, openSheet }) {
         <span class="card-meta"><b>${fmtWater(ml, units)}</b> / ${fmtWater(goal, units)}${done ? ' ✓' : ''}</span>
       </div>
       <div class="drops" style=${{ gridTemplateColumns: `repeat(${Math.min(count, 12)}, 1fr)` }}>
+        <${Celebrate} trigger=${done} color="var(--water)" />
         ${Array.from({ length: count }, (_, i) => html`
           <button type="button" class="drop" onClick=${() => tap(i)} aria-label=${`Set water to ${fmtWater((i + 1) * per, units)}`}>
             <${Drop} fill=${Math.max(0, Math.min(1, filled - i))} id=${`drop-${i}`} />

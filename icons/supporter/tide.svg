@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#0E2A3D"/>
+      <stop offset="1" stop-color="#04101A"/>
+    </linearGradient>
+    <filter id="glow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="22"/>
+    </filter>
+    <clipPath id="inner"><circle cx="512" cy="512" r="232"/></clipPath>
+  </defs>
+  <rect width="1024" height="1024" fill="url(#bg)"/>
+  <circle cx="512" cy="512" r="300" fill="none" stroke="#5CE1E6" stroke-opacity="0.14" stroke-width="80"/>
+  <circle cx="512" cy="512" r="300" fill="none" stroke="#5CE1E6" stroke-opacity="0.55" stroke-width="80" stroke-linecap="round" stroke-dasharray="1414 1885" transform="rotate(-90 512 512)" filter="url(#glow)"/>
+  <circle cx="512" cy="512" r="300" fill="none" stroke="#5CE1E6" stroke-width="80" stroke-linecap="round" stroke-dasharray="1414 1885" transform="rotate(-90 512 512)"/>
+  <g clip-path="url(#inner)">
+    <path d="M260 560c42-28 84-28 126 0s84 28 126 0 84-28 126 0 84 28 126 0V800H260z" fill="#59B8FF" fill-opacity="0.85"/>
+    <path d="M260 620c42-28 84-28 126 0s84 28 126 0 84-28 126 0 84 28 126 0V800H260z" fill="#5CE1E6"/>
+  </g>
+</svg>

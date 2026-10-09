@@ -10,6 +10,8 @@ import { AI_MODELS } from '../ai.js';
 import { DEMO, PAID } from '../demo.js';
 import { CreditCard } from './credit.js';
 import { AiCostCard } from './costs.js';
+import { SupporterCard } from './supporter.js';
+import { SUPPORTER_ON } from '../supporter.js';
 
 
 // Profile inputs, shared by onboarding and settings. Calls onChange only with valid values.
@@ -148,6 +150,8 @@ export function SettingsView({ go, section, openSheet }) {
         <${Segmented} className="seg-sm" options=${[{ value: 'us', label: 'US' }, { value: 'metric', label: 'Metric' }]} value=${units} onChange=${(v) => setSettings({ units: v })} />
       </div>
     </section>
+
+    ${SUPPORTER_ON && html`<${SupporterCard} />`}
 
     <section class="card set-section">
       <h2 class="card-title">About you</h2>

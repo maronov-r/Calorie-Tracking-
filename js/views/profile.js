@@ -11,6 +11,7 @@ import {
 import { coachLine, calorieCheck } from '../coach.js';
 import { withTrend, weeklyRate, paceAdvice, fmtRate } from '../weight.js';
 import { WeightChart, IntakeChart } from '../charts.js';
+import { isSupporter, SupporterBadge } from './supporter.js';
 
 const RANGES = [{ value: '30', label: '30 days' }, { value: '90', label: '90 days' }, { value: 'all', label: 'All' }];
 const lastDays = (n, end) => Array.from({ length: n }, (_, i) => shiftKey(end, i - n + 1));
@@ -87,6 +88,7 @@ export function ProfileView({ openSheet, go }) {
         <h1 class="title">Profile</h1>
         <p class="subtitle">${g.label} · ${p.age} · ${heightLabel(p.heightCm, units)}</p>
       </div>
+      ${isSupporter() && html`<${SupporterBadge} />`}
     </header>
 
     <${PlanCard} t=${t} openSheet=${openSheet} />

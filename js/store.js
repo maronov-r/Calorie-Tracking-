@@ -2,6 +2,7 @@
 import { useReducer, useEffect } from './vendor/preact.js';
 import { idbEntries, idbSet, idbClear, idbSetMany } from './lib/db.js';
 import { computeTargets, dayTotals, addInto, normalizeProfile, styleFor, fmtKcal, ML_PER_OZ } from './nutrients.js';
+import { SUPPORTER_ON, PREMIUM_THEMES, applyIcon } from './supporter.js';
 
 const THEME_KEY = globalThis.PLATE_DB ? `${globalThis.PLATE_DB}-theme` : globalThis.PLATE_DEMO ? 'plate-demo-theme' : 'plate-theme';
 
@@ -88,6 +89,7 @@ export async function loadState() {
     if (JSON.stringify(next) !== JSON.stringify(state.profile)) setProfile(next);
   }
   applyTheme(state.settings.theme);
+  if (SUPPORTER_ON && state.settings.supporter) applyIcon(state.settings.appIcon);
   state.ready = true;
   emit();
   if (navigator.storage?.persist) navigator.storage.persist().catch(() => {});
@@ -240,11 +242,13 @@ export function deleteWeight(key) {
   emit();
 }
 
-export function applyTheme(theme) {
-  const t = THEMES.find((x) => x.value === theme) || THEMES[0];
+// Supporter themes apply once unlocked, or for a quick preview (temp), which isn't remembered.
+export function applyTheme(theme, temp = false) {
+  const premium = SUPPORTER_ON && (temp || state.settings.supporter) ? PREMIUM_THEMES : [];
+  const t = [...THEMES, ...premium].find((x) => x.value === theme) || THEMES[0];
   document.documentElement.setAttribute('data-theme', t.value);
   document.querySelector('meta[name=theme-color]')?.setAttribute('content', t.color);
-  try { localStorage.setItem(THEME_KEY, t.value); } catch (e) { /* private mode */ }
+  if (!temp) try { localStorage.setItem(THEME_KEY, t.value); } catch (e) { /* private mode */ }
 }
 
 // ---- Water bottles ----

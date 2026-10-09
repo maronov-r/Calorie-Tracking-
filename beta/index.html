@@ -22,11 +22,13 @@
     (function () {
       var t = 'oat';
       try { t = localStorage.getItem('plate-beta-theme') || 'oat'; } catch (e) {}
-      var colors = { oat: '#F2EEE6', midnight: '#0A0B0D', porcelain: '#F6F6F7' };
+      var colors = { oat: '#F2EEE6', midnight: '#0A0B0D', porcelain: '#F6F6F7',
+        // Supporter Pack themes (js/supporter.js)
+        grove: '#0C1410', tide: '#06141F', harvest: '#17100C', sunrise: '#FFF1E6', lavender: '#F3F0FA', ink: '#FFFFFF' };
       if (!colors[t]) t = 'oat';
       document.documentElement.setAttribute('data-theme', t);
       document.querySelector('meta[name=theme-color]').setAttribute('content', colors[t]);
-      if (t === 'midnight') document.querySelector('meta[name=apple-mobile-web-app-status-bar-style]').setAttribute('content', 'black-translucent');
+      if (/^(midnight|grove|tide|harvest)$/.test(t)) document.querySelector('meta[name=apple-mobile-web-app-status-bar-style]').setAttribute('content', 'black-translucent');
     })();
   </script>
   <script>window.PLATE_SERVER = 'https://plate-api.mreuvenaronov.workers.dev'; window.PLATE_DB = 'plate-beta'; // real AI through the Plate server, separate storage</script>
