@@ -15,7 +15,7 @@ let cheeredOn = null; // the streak party plays once a day, the first time Today
 
 
 // A mascot that can be tapped: squishes and sends up hearts.
-function Buddy({ m, mood, label, className = '' }) {
+function Buddy({ m, mood, label, className = '', onTap }) {
   const ref = useRef();
   const svg = useMemo(() => mascotSvg(m, mood, label), [m.ch, m.pal, mood, label]);
   const boop = () => {
@@ -25,19 +25,23 @@ function Buddy({ m, mood, label, className = '' }) {
     void el.getBBox();
     el.classList.add('boop');
     setTimeout(() => el.classList.remove('boop'), 1200);
+    onTap?.();
   };
   return html`<button type="button" ref=${ref} class="buddy-btn ${className}" onClick=${boop} aria-label=${`${label}. Tap to say hi`}
     dangerouslySetInnerHTML=${{ __html: svg }} />`;
 }
 
-// ---- Today: the mascot and one line about the day ----
+// ---- Today: a small mascot perched on the corner of the calorie card ----
+// It stays quiet; a speech bubble pops up only when something happens or when it's tapped.
 
-export function BuddyCard({ dateKey, totals, t, water }) {
+export function BuddyPerch({ dateKey, totals, t, water }) {
   const s = useStore();
   const m = mascotSettings(s.settings);
   const today = todayKey();
   const [flash, setFlash] = useState(null);
+  const [talk, setTalk] = useState(false);
   const timer = useRef();
+  const talkTimer = useRef();
   const prevWater = useRef(water);
   const prevMet = useRef(null);
 
@@ -50,12 +54,18 @@ export function BuddyCard({ dateKey, totals, t, water }) {
   const streak = loggedStreak(today);
   const logged = getDay(dateKey).entries.length > 0;
 
+  const say = (ms) => {
+    setTalk(true);
+    clearTimeout(talkTimer.current);
+    talkTimer.current = setTimeout(() => setTalk(false), ms);
+  };
   const show = (mood, ms) => {
     setFlash(mood);
     clearTimeout(timer.current);
     timer.current = setTimeout(() => setFlash(null), ms);
+    say(ms);
   };
-  useEffect(() => () => clearTimeout(timer.current), []);
+  useEffect(() => () => { clearTimeout(timer.current); clearTimeout(talkTimer.current); }, []);
   useEffect(() => {
     if (water > prevWater.current) show('water', 5000);
     prevWater.current = water;
@@ -85,12 +95,9 @@ export function BuddyCard({ dateKey, totals, t, water }) {
   }[mood];
 
   return html`
-    <div class="card buddy-card">
-      <${Buddy} m=${m} mood=${mood} label=${name} />
-      <div class="buddy-talk" aria-live="polite">
-        <b>${name}</b>
-        <p>${line}</p>
-      </div>
+    <div class="buddy-perch">
+      <div class="buddy-say" aria-live="polite">${talk && html`<p class="buddy-bubble"><b>${name}</b> ${line}</p>`}</div>
+      <${Buddy} m=${m} mood=${mood} label=${name} onTap=${() => say(4500)} />
     </div>`;
 }
 
