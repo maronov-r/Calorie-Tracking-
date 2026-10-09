@@ -28,14 +28,19 @@
   if (meta) new MutationObserver(syncStatusBar).observe(meta, { attributes: true, attributeFilter: ['content'] });
 
   // App icon: the Supporter Pack picker swaps the tab icon (link rel=icon); mirror that onto the real home screen icon.
-  var PlateIcon = plugin('PlateIcon');
   var iconLink = document.querySelector('link[rel=icon]');
+  var lastIcon;
   var syncIcon = function () {
-    if (!PlateIcon || !iconLink) return;
+    if (!iconLink || !C.nativePromise) return;
     var m = /supporter\/([a-z]+)\.svg$/.exec(iconLink.getAttribute('href') || '');
-    PlateIcon.set({ name: m ? 'AppIcon-' + m[1] : null }).catch(function (e) { console.warn('App icon not changed', e); });
+    var name = m ? 'AppIcon-' + m[1] : null;
+    if (name === lastIcon) return;
+    lastIcon = name;
+    console.log('Plate: app icon -> ' + (name || 'default'));
+    C.nativePromise('PlateIcon', 'set', { name: name }).catch(function (e) { console.warn('Plate: app icon not changed', e && e.message); });
   };
   if (iconLink) new MutationObserver(syncIcon).observe(iconLink, { attributes: true, attributeFilter: ['href'] });
+  else console.warn('Plate: no icon link found');
 
   // Keyboard: keep the field you're typing in visible once the keyboard is up.
   if (Keyboard && Keyboard.addListener) {
