@@ -23,7 +23,12 @@ page = page.replace(viewport, '<meta name="viewport" content="width=device-width
 
 // Status bar + keyboard helpers, and no rubber-band bounce on the page itself.
 fs.copyFileSync('scripts/native/native.js', `${out}/js/native.js`);
-page = page.replace(tag, `<script src="js/native.js"></script>\n  <style>html.native, html.native body { overscroll-behavior: none; }</style>\n  ${tag}`);
+// A solid strip behind the status bar, so page content doesn't scroll underneath the clock.
+const nativeCss = [
+  'html.native, html.native body { overscroll-behavior: none; }',
+  "html.native body::before { content: ''; position: fixed; top: 0; left: 0; right: 0; height: env(safe-area-inset-top); background: var(--bg); z-index: 45; pointer-events: none; }",
+].join(' ');
+page = page.replace(tag, `<script src="js/native.js"></script>\n  <style>${nativeCss}</style>\n  ${tag}`);
 
 fs.writeFileSync(`${out}/index.html`, page);
 
@@ -33,4 +38,11 @@ const swCheck = "if ('serviceWorker' in navigator && !local) {";
 let app = fs.readFileSync(appJs, 'utf8');
 if (!app.includes(swCheck)) throw new Error('js/app.js: service worker check not found');
 fs.writeFileSync(appJs, app.replace(swCheck, "if ('serviceWorker' in navigator && !local && !window.Capacitor) {"));
+
+// In the app, the icon picker really changes the home screen icon, so drop the website's "browser tab" note.
+const spJs = `${out}/js/views/supporter.js`;
+const iconNote = 'Applies on the App Store version. Here it changes the browser tab icon.';
+let sp = fs.readFileSync(spJs, 'utf8');
+if (!sp.includes(iconNote)) throw new Error('js/views/supporter.js: app icon note not found');
+fs.writeFileSync(spJs, sp.replace(iconNote, 'Changes your home screen icon.'));
 console.log('www/ ready');

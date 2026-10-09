@@ -49,5 +49,36 @@ class MainViewController: CAPBridgeViewController {
     override func capacitorDidLoad() {
         webView?.scrollView.bounces = false
         webView?.scrollView.alwaysBounceVertical = false
+        bridge?.registerPluginInstance(PlateIconPlugin())
+    }
+}
+
+// Lets the Supporter Pack "App icon" picker change the real home screen icon.
+// The icons live in Assets.xcassets as AppIcon-<name>; passing no name goes back to the original.
+@objc(PlateIconPlugin)
+public class PlateIconPlugin: CAPPlugin, CAPBridgedPlugin {
+    public let identifier = "PlateIconPlugin"
+    public let jsName = "PlateIcon"
+    public let pluginMethods: [CAPPluginMethod] = [
+        CAPPluginMethod(name: "set", returnType: CAPPluginReturnPromise)
+    ]
+
+    @objc func set(_ call: CAPPluginCall) {
+        let name = call.getString("name")
+        DispatchQueue.main.async {
+            let app = UIApplication.shared
+            guard app.supportsAlternateIcons else {
+                call.unavailable("This device can't change app icons")
+                return
+            }
+            // Only change it when it's actually different, so iOS doesn't show its "icon changed" alert on every launch.
+            if app.alternateIconName == name {
+                call.resolve()
+                return
+            }
+            app.setAlternateIconName(name) { error in
+                if let error = error { call.reject(error.localizedDescription) } else { call.resolve() }
+            }
+        }
     }
 }
