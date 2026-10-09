@@ -11,9 +11,9 @@ import {
 import { describeAmount } from '../foods.js';
 import { proteinIdeas } from '../coach.js';
 import { WaterCard } from './water.js';
-import { Celebrate } from './supporter.js';
+import { Celebrate, isSupporter } from './supporter.js';
 import { BuddyPerch } from './mascot.js';
-import { MASCOT_ON, mascotSettings } from '../mascot.js';
+import { mascotSettings } from '../mascot.js';
 
 const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
@@ -78,8 +78,8 @@ export function Today({ dateKey, setDateKey, openSheet, go }) {
         <button type="button" class="icon-btn sm" onClick=${() => setSettings({ hideInstallHint: true })} aria-label="Dismiss"><${Icon} name="close" size=${16} /></button>
       </div>`}
 
-    <div class="perch-wrap ${MASCOT_ON && mascotSettings(s.settings).on && dateKey === today ? 'has-buddy' : ''}">
-      ${MASCOT_ON && html`<${BuddyPerch} dateKey=${dateKey} totals=${totals} t=${t} water=${day.water || 0} />`}
+    <div class="perch-wrap ${isSupporter() && mascotSettings(s.settings).on && dateKey === today ? 'has-buddy' : ''}">
+      ${isSupporter() && html`<${BuddyPerch} dateKey=${dateKey} totals=${totals} t=${t} water=${day.water || 0} />`}
       <${CalorieCard} totals=${totals} t=${t} profile=${s.profile} isToday=${dateKey === today} openSheet=${openSheet} />
     </div>
     <${WaterCard} dateKey=${dateKey} ml=${day.water || 0} goal=${t.water} units=${s.settings.units} openSheet=${openSheet} />

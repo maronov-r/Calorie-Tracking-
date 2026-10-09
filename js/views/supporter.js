@@ -3,6 +3,7 @@ import { html, useState, useEffect, useRef } from '../vendor/preact.js';
 import { useStore, state, setSettings, applyTheme, toast } from '../store.js';
 import { Icon, Segmented } from '../ui.js';
 import { SUPPORTER_ON, PACK_PRICE, PREMIUM_THEMES, APP_ICONS, iconFor, applyIcon } from '../supporter.js';
+import { mascotSvg } from '../mascot.js';
 
 export const isSupporter = () => SUPPORTER_ON && !!state.settings.supporter;
 
@@ -81,8 +82,12 @@ export function SupporterCard() {
         <li><b>${APP_ICONS.length - 1} app icons</b> for your home screen</li>
         <li><b>Goal celebrations</b>, a little burst when you hit a target
           <button type="button" class="link" onClick=${() => setPlay((n) => n + 1)}>Try it</button></li>
+        <li><b>A buddy</b> on your Today screen: Sprout, Avo or Drop, in your color and with your name</li>
         <li><b>A supporter badge</b> on your profile</li>
       </ul>
+      <div class="sp-buddies" aria-hidden="true">
+        ${['sprout', 'avo', 'drop'].map((ch, i) => html`<span dangerouslySetInnerHTML=${{ __html: mascotSvg({ ch, pal: 0 }, ['goal', 'water', 'cheer'][i]) }} />`)}
+      </div>
 
       <p class="group-label">Themes</p>
       <div class="themes">

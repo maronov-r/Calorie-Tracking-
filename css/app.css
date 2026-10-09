@@ -1888,3 +1888,6 @@ svg { flex-shrink: 0; }
   .mascot .conf, .mascot .z, .mascot .bubble, .mascot .heart { opacity: 0; }
   .mascot .spark { opacity: 1; transform: none; }
 }
+.sp-buddies { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; padding: 6px 12px 2px; overflow: hidden; border-radius: 16px; background: var(--surface-2); }
+.sp-buddies span { line-height: 0; }
+.sp-buddies svg { width: 100%; height: auto; }

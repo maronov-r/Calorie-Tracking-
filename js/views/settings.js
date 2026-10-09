@@ -10,10 +10,9 @@ import { AI_MODELS } from '../ai.js';
 import { DEMO, PAID } from '../demo.js';
 import { CreditCard } from './credit.js';
 import { AiCostCard } from './costs.js';
-import { SupporterCard } from './supporter.js';
+import { SupporterCard, isSupporter } from './supporter.js';
 import { SUPPORTER_ON } from '../supporter.js';
 import { MascotCard } from './mascot.js';
-import { MASCOT_ON } from '../mascot.js';
 
 
 // Profile inputs, shared by onboarding and settings. Calls onChange only with valid values.
@@ -153,7 +152,7 @@ export function SettingsView({ go, section, openSheet }) {
       </div>
     </section>
 
-    ${MASCOT_ON && html`<${MascotCard} />`}
+    ${isSupporter() && html`<${MascotCard} />`}
 
     ${SUPPORTER_ON && html`<${SupporterCard} />`}
 

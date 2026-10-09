@@ -1,8 +1,5 @@
 // Plate's mascots: Sprout, Avo and Drop. Drawn as SVG and animated with CSS (see .mascot in app.css).
-// For now they only appear on the demo and test pages, like the Supporter Pack.
-import { SUPPORTER_ON } from './supporter.js';
-
-export const MASCOT_ON = SUPPORTER_ON;
+// The buddy is part of the Supporter Pack (see views/supporter.js), so it appears only once the pack is unlocked.
 
 const INK = '#1C1612';
 
