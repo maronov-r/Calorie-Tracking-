@@ -3,7 +3,7 @@ import { useStore, saveSupplement, deleteSupplement, logAiCost } from '../store.
 import { Icon, Sheet, NumberInput } from '../ui.js';
 import { N, SUPP_FIELDS, SUPP_PRESETS, fmtNum } from '../nutrients.js';
 import { readSupplementLabel, prepareImage, aiErrorMessage } from '../ai.js';
-import { DEMO } from '../demo.js';
+import { DEMO, BETA, settleUse } from '../demo.js';
 
 // One line for lists: tracked nutrients first, then anything else on the label.
 export function suppSummary(sp) {
@@ -57,6 +57,7 @@ function SupplementForm({ supp, close, toSettings }) {
       setScan((x) => ({ ...x, photo: img.dataUrl }));
       const res = await readSupplementLabel({ apiKey: s.settings.apiKey, model: s.settings.model, imageB64: img.b64 });
       logAiCost('label', res.cost);
+      if (BETA) settleUse('Label scan');
       if (res.name) setName(res.name);
       setN(res.n);
       setExtra(res.extra);

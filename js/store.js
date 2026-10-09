@@ -3,7 +3,7 @@ import { useReducer, useEffect } from './vendor/preact.js';
 import { idbEntries, idbSet, idbClear, idbSetMany } from './lib/db.js';
 import { computeTargets, dayTotals, addInto, normalizeProfile, styleFor, fmtKcal, ML_PER_OZ } from './nutrients.js';
 
-const THEME_KEY = globalThis.PLATE_DEMO ? 'plate-demo-theme' : 'plate-theme';
+const THEME_KEY = globalThis.PLATE_DB ? `${globalThis.PLATE_DB}-theme` : globalThis.PLATE_DEMO ? 'plate-demo-theme' : 'plate-theme';
 
 export const THEMES = [
   { value: 'oat', label: 'Oat', hint: 'Warm paper, forest green', color: '#F2EEE6', swatch: ['#F2EEE6', '#2F5D46', '#C4683F'] },

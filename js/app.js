@@ -12,7 +12,7 @@ import { WaterSheet } from './views/water.js';
 import { SupplementSheet } from './views/supplements.js';
 import { BuilderSheet } from './views/builder.js';
 import { Onboarding } from './views/onboarding.js';
-import { DEMO } from './demo.js';
+import { DEMO, BETA, ensureAccount } from './demo.js';
 import { TopUpSheet } from './views/credit.js';
 
 const TABS = [
@@ -47,6 +47,8 @@ function App() {
     if (s.ready && s.profile) (window.requestIdleCallback || setTimeout)(() => loadFoods().then(emit).catch(() => {}));
   }, [s.ready, !!s.profile]);
 
+  useEffect(() => { if (s.ready && s.profile) ensureAccount().catch(() => {}); }, [s.ready, !!s.profile]);
+
   if (!s.ready) return html`<div class="boot" />`;
   if (!s.profile) return html`<${Onboarding} />`;
 
@@ -59,6 +61,7 @@ function App() {
 
   return html`
     ${DEMO && html`<div class="demo-ribbon">Demo version · fake money, your real data isn’t touched</div>`}
+    ${BETA && html`<div class="demo-ribbon">Test version · real AI, pretend money</div>`}
     <main class="app">
       ${tab === 'today' && html`<${Today} dateKey=${day} setDateKey=${setDay} openSheet=${setSheet} go=${go} />`}
       ${tab === 'nutrients' && html`<${NutrientsView} dateKey=${day} openSheet=${setSheet} go=${go} />`}

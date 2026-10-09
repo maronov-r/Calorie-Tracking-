@@ -1,11 +1,17 @@
 // Demo of the pay-as-you-go AI coach: fake credit, a pretend checkout and built-in answers.
 // Only active on the demo page (demo/index.html sets PLATE_DEMO). No money, no server, no API key.
-import { state, setWallet, getTargets, styleOn, totalsFor, toast, dateKey as todayKey } from './store.js';
+// BETA (beta/index.html sets PLATE_SERVER): the same screens, but the balance lives on the Plate server
+// and answers come from the real AI through it. No API key on the phone; credit is pretend (test mode).
+import { state, setWallet, setSettings, getTargets, styleOn, totalsFor, toast, dateKey as todayKey } from './store.js';
 import { computeTargets, styleFor, goalFor, paceFor, experienceFor, normalizeProfile, STYLES, KG_PER_LB } from './nutrients.js';
 import { goalGuide, styleGuide, planWhy, proteinIdeas, calorieCheck, coachLine } from './coach.js';
 import { foodByName } from './foods.js';
 
 export const DEMO = !!globalThis.PLATE_DEMO;
+export const SERVER = globalThis.PLATE_SERVER || '';
+export const BETA = !!SERVER;
+export const PAID = DEMO || BETA; // the app shows coach credit instead of an API key
+export const MIN_CENTS = BETA ? 10 : 0.01; // the server sets aside 10¢ while an answer runs
 
 export const PRICE_CENTS = 5; // what one question costs the user: one simple, flat price
 export const AI_COST_CENTS = 3; // what one question costs the owner in AI today
@@ -21,7 +27,7 @@ export const PACKS = [
 ];
 
 export const fmtMoney = (cents) => `$${(Math.max(0, cents) / 100).toFixed(2)}`;
-export const fmtCents = (cents) => (cents < 100 ? `${cents}¢` : fmtMoney(cents));
+export const fmtCents = (cents) => (cents < 100 ? `${Number.isInteger(cents) ? cents : cents.toFixed(1)}¢` : fmtMoney(cents));
 export function questionsFor(cents) {
   const n = cents / PRICE_CENTS;
   return n >= 100 ? Math.round(n / 10) * 10 : Math.max(1, Math.round(n));
@@ -45,13 +51,66 @@ export function charge(cents, what) {
   return taken;
 }
 
-export function addCredit(pack) {
+export async function addCredit(pack) {
+  if (BETA) {
+    await api('/test/add-credit', { method: 'POST', body: JSON.stringify({ cents: pack.credit }) });
+    const before = wallet().cents;
+    await refreshBalance();
+    save({ paid: wallet().paid + pack.value }, { t: Date.now(), what: `Added ${pack.label} (test money)`, cents: wallet().cents - before });
+    toast(`Added ${fmtMoney(pack.credit)} of test credit`);
+    return;
+  }
   const w = wallet();
   save({ cents: w.cents + pack.credit, paid: w.paid + pack.value }, { t: Date.now(), what: `Added ${pack.label}${pack.credit > pack.value ? ` (+${fmtMoney(pack.credit - pack.value)} bonus)` : ''}`, cents: pack.credit });
   toast(`Added ${fmtMoney(pack.credit)} of credit`);
 }
 
 export const setDemoBalance = (cents) => save({ cents }, { t: Date.now(), what: 'Demo: balance set by hand', cents: cents - wallet().cents });
+
+// ---- The Plate server (BETA) ----
+
+async function api(path, init = {}) {
+  const res = await fetch(SERVER + path, {
+    ...init,
+    headers: { 'content-type': 'application/json', ...(state.settings.apiKey ? { 'x-api-key': state.settings.apiKey } : {}), ...(init.headers || {}) },
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw Object.assign(new Error(data?.error?.message || 'The Plate server had a problem.'), { status: res.status });
+  return data;
+}
+
+// The phone's account: a random secret the server made, kept like an API key (never exported).
+export async function ensureAccount() {
+  if (!BETA) return;
+  if (state.settings.apiKey?.startsWith('plate_')) return refreshBalance();
+  const a = await api('/account', { method: 'POST' });
+  setSettings({ apiKey: a.token });
+  setWallet({ ...wallet(), cents: a.balance_cents, log: a.balance_cents ? [{ t: Date.now(), what: 'Free starter credit', cents: a.balance_cents }] : [] });
+}
+
+export async function refreshBalance() {
+  if (!BETA || !state.settings.apiKey) return;
+  try {
+    const a = await api('/account');
+    setWallet({ ...wallet(), cents: a.balance_cents });
+  } catch (err) {
+    if (err.status === 401) { setSettings({ apiKey: '' }); return ensureAccount(); } // account was deleted
+  }
+}
+
+// After an AI call: read the new balance and note what it took.
+export async function settleUse(what) {
+  const before = wallet().cents;
+  await refreshBalance();
+  const used = Math.max(0, Math.round((before - wallet().cents) * 100) / 100);
+  if (used) save({}, { t: Date.now(), what, cents: -used });
+  return used;
+}
+
+// Removes the balance and its cost ledger from the server. Data on the phone is untouched.
+export async function deleteServerAccount() {
+  if (BETA && state.settings.apiKey) await api('/account', { method: 'DELETE' }).catch(() => {});
+}
 
 // Where a top-up goes, from the owner's side.
 export function split(pack) {

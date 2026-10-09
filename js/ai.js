@@ -78,7 +78,8 @@ class AiError extends Error {}
 let sdk;
 async function getClient(apiKey) {
   if (!sdk) sdk = await import('./vendor/anthropic.js');
-  return new sdk.Anthropic({ apiKey, dangerouslyAllowBrowser: true, maxRetries: 1 });
+  const server = globalThis.PLATE_SERVER;
+  return new sdk.Anthropic({ apiKey, dangerouslyAllowBrowser: true, maxRetries: 1, ...(server ? { baseURL: server } : {}) });
 }
 
 export async function estimateMeal({ apiKey, model, text, imageB64 }) {
@@ -346,7 +347,8 @@ export function aiErrorMessage(err) {
   if (err instanceof AiError) return err.message;
   const status = err?.status;
   const msg = String(err?.message || '');
-  if (status === 401) return 'That API key was rejected. Check it in Settings.';
+  if (status === 402) return 'You’re out of coach credit. Add credit to keep using AI.';
+  if (status === 401) return globalThis.PLATE_SERVER ? 'Your Plate account wasn’t found. Reopen the app and try again.' : 'That API key was rejected. Check it in Settings.';
   if (status === 403) return "This API key doesn't have access. Check it in Settings.";
   if (status === 400 && /credit/i.test(msg)) return 'Your Anthropic account is out of credits. Add some at console.anthropic.com.';
   if (status === 429) return 'Too many requests right now. Wait a moment and try again.';

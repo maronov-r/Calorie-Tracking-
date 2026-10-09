@@ -7,7 +7,7 @@ import { Icon, Segmented, NumberInput } from '../ui.js';
 import { dailyFor, workoutTypeFor, experienceFor, normalizeProfile, ML_PER_OZ, fmtNum, fmtKcal, computeTargets, goalFor, styleFor, KG_PER_LB } from '../nutrients.js';
 import { suppSummary } from './supplements.js';
 import { AI_MODELS } from '../ai.js';
-import { DEMO } from '../demo.js';
+import { DEMO, PAID } from '../demo.js';
 import { CreditCard } from './credit.js';
 import { AiCostCard } from './costs.js';
 
@@ -182,7 +182,7 @@ export function SettingsView({ go, section, openSheet }) {
       </div>
     </section>
 
-    ${DEMO ? html`<${CreditCard} openSheet=${openSheet} />` : html`<section class="card set-section" id="ai">
+    ${PAID ? html`<${CreditCard} openSheet=${openSheet} />` : html`<section class="card set-section" id="ai">
       <h2 class="card-title">AI food logging</h2>
       <p class="fine">Describe a meal or snap a photo and Claude estimates it, vitamins included. It uses your own Anthropic API key, which never leaves this phone except to talk to Anthropic. You pay per use, with no subscription.</p>
       <label class="field">

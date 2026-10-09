@@ -1,6 +1,6 @@
 import { html, useState, useEffect, useMemo, useRef } from '../vendor/preact.js';
 import {
-  useStore, MEALS, mealLabel, mealForNow, addEntries, pushRecent, saveCustomFood, getTargets, toast, logAiCost,
+  useStore, state, MEALS, mealLabel, mealForNow, addEntries, pushRecent, saveCustomFood, getTargets, toast, logAiCost,
 } from '../store.js';
 import { Icon, Sheet, Segmented, Stepper, NumberInput, NutritionSummary, Empty } from '../ui.js';
 import {
@@ -8,7 +8,7 @@ import {
 } from '../foods.js';
 import { fmtKcal, fmtNum, fmtQty, NUTRIENTS, N } from '../nutrients.js';
 import { estimateMeal, aiErrorMessage, prepareImage, AI_MODELS } from '../ai.js';
-import { DEMO } from '../demo.js';
+import { DEMO, BETA, settleUse, ensureAccount } from '../demo.js';
 import { ScanPane } from './scan.js';
 
 export function AddSheet({ dateKey, meal, mode, query, onClose, toSettings }) {
@@ -247,8 +247,10 @@ function AiPane({ initialText, onLog, toSettings }) {
     setBusy(true);
     setErr('');
     try {
-      const out = await estimateMeal({ apiKey: s.settings.apiKey, model: model.id, text, imageB64: photo?.b64 });
+      if (BETA) await ensureAccount();
+      const out = await estimateMeal({ apiKey: state.settings.apiKey, model: model.id, text, imageB64: photo?.b64 });
       logAiCost('meal', out.cost);
+      if (BETA) settleUse('Meal log');
       setRes({ note: out.note, items: out.items.map((it) => ({ food: aiFood(it), portion: it.portion, mult: 1, on: true })) });
     } catch (x) {
       setErr(aiErrorMessage(x));

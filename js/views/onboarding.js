@@ -3,7 +3,7 @@ import { setProfile, setSettings, setWeight, dateKey as todayKey } from '../stor
 import { Ring } from '../ui.js';
 import { PlanBuilder } from './builder.js';
 import { recommendGoal } from '../nutrients.js';
-import { DEMO } from '../demo.js';
+import { PAID } from '../demo.js';
 
 // 5′10″, 200 lb, new to lifting, planning weights 3× a week, high protein and low carb.
 const SAMPLE = {
@@ -31,7 +31,7 @@ export function Onboarding() {
           <p class="ob-lead">Calories, water and vitamins, tracked simply, with a plan built around you. Everything stays on your phone, and there's no subscription.</p>
         </div>
         <button type="button" class="btn btn-primary btn-block btn-lg" onClick=${() => setStarted(true)}>Get started</button>
-        ${DEMO && html`<button type="button" class="btn btn-quiet btn-block" onClick=${() => finish({ ...SAMPLE, goal: recommendGoal(SAMPLE).goal }, 'low_carb')}>Skip: use a sample person</button>`}
+        ${PAID && html`<button type="button" class="btn btn-quiet btn-block" onClick=${() => finish({ ...SAMPLE, goal: recommendGoal(SAMPLE).goal }, 'low_carb')}>Skip: use a sample person</button>`}
       </div>`;
   }
 

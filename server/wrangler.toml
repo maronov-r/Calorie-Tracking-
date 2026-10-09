@@ -1,0 +1,21 @@
+# Plate's AI server on Cloudflare Workers.
+# The Anthropic key is a secret, set with:  npx wrangler secret put ANTHROPIC_API_KEY
+name = "plate-api"
+main = "src/index.js"
+compatibility_date = "2025-06-01"
+workers_dev = true
+
+# No request logging: questions and answers are never recorded.
+[observability]
+enabled = false
+
+[vars]
+MARKUP = "1.8"           # people pay what the AI costs × this
+STARTER_CENTS = "25"     # free credit for a new account
+TEST_MODE = "true"       # allows the pretend "add credit" button; set to "false" before real payments
+ALLOWED_ORIGINS = "https://maronov-r.github.io,http://localhost:5173"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "plate"
+database_id = "c661b4b4-0131-4fd5-b05b-83e4ae34bf05"

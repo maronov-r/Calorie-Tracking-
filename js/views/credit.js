@@ -1,10 +1,10 @@
 // Demo of coach credit: the privacy promise, a pretend checkout and the balance in Settings.
 import { html, useState } from '../vendor/preact.js';
-import { useStore, eraseAll } from '../store.js';
+import { useStore, eraseAll, toast } from '../store.js';
 import { Icon, Sheet } from '../ui.js';
 import { coachContext } from '../coach.js';
 import {
-  wallet, addCredit, markPrivacySeen, setDemoBalance, split, fmtMoney, fmtCents, questionsFor, PACKS, STARTER_CENTS, PRICE_CENTS, AI_COST_CENTS, LEAN_AI_COST_CENTS,
+  BETA, deleteServerAccount, wallet, addCredit, markPrivacySeen, setDemoBalance, split, fmtMoney, fmtCents, questionsFor, PACKS, STARTER_CENTS, PRICE_CENTS, AI_COST_CENTS, LEAN_AI_COST_CENTS,
 } from '../demo.js';
 import { ChoiceList } from './settings.js';
 
@@ -25,7 +25,7 @@ export function PrivacyPane({ onDone }) {
       </ul>
       <button type="button" class="link" onClick=${() => setShow(!show)}>${show ? 'Hide' : 'See exactly'} what the coach gets</button>
       ${show && html`<pre class="pp-shared">${coachContext()}</pre>`}
-      <p class="fine">In this demo, nothing leaves your phone at all.</p>
+      <p class="fine">${BETA ? 'This is a test version: answers come from the real AI through your Plate server, and credit is pretend.' : 'In this demo, nothing leaves your phone at all.'}</p>
       ${!w.seenPrivacy && html`<p class="pp-credit">You have <b>${fmtCents(STARTER_CENTS)} free</b> to try it: about ${questionsFor(STARTER_CENTS)} questions.</p>`}
       <button type="button" class="btn btn-primary btn-block" onClick=${done}>${w.seenPrivacy ? 'Back to the chat' : 'Got it'}</button>
     </div>`;
@@ -38,7 +38,9 @@ export function TopUp({ onDone, onCancel }) {
   const pack = PACKS.find((x) => x.value === pick);
   const pay = () => {
     setBusy(true);
-    setTimeout(() => { addCredit(pack); onDone(); }, 1100);
+    Promise.all([addCredit(pack), new Promise((r) => setTimeout(r, 1100))])
+      .then(onDone)
+      .catch((err) => { setBusy(false); toast(err.message || "Couldn’t add credit. Try again."); });
   };
   return html`
     <div class="topup">
@@ -107,8 +109,8 @@ export function CreditCard({ openSheet }) {
 
       <p class="list-label">Demo tools</p>
       <div class="chips">
-        <button type="button" class="chip" onClick=${() => setDemoBalance(5)}>Set credit to 5¢</button>
-        <button type="button" class="chip" onClick=${() => eraseAll()}>Start the demo over</button>
+        ${!BETA && html`<button type="button" class="chip" onClick=${() => setDemoBalance(5)}>Set credit to 5¢</button>`}
+        <button type="button" class="chip" onClick=${async () => { await deleteServerAccount(); eraseAll(); }}>${BETA ? 'Delete my AI account and start over' : 'Start the demo over'}</button>
       </div>
     </section>`;
 }
