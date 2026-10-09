@@ -5,5 +5,14 @@
   "ios": {
     "contentInset": "never",
     "backgroundColor": "#F2EEE6"
+  },
+  "plugins": {
+    "Keyboard": {
+      "resize": "native",
+      "resizeOnFullScreen": true
+    },
+    "StatusBar": {
+      "overlaysWebView": true
+    }
   }
 }
