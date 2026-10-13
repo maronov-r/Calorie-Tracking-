@@ -1,7 +1,7 @@
 import { html, useState } from '../vendor/preact.js';
 import { useStore, getTargets, totalsFor, weekAverage, getDay, dateKey as todayKey } from '../store.js';
 import { Icon, Ring, Bar, Segmented, Sheet, statusColor } from '../ui.js';
-import { N, INFO, UPPER, MACROS, VITAMINS, MINERALS, MICROS, status, fmtNum, suppExtras } from '../nutrients.js';
+import { N, INFO, UPPER, MACROS, VITAMINS, MINERALS, MICROS, status, fmtNum, suppExtras, suppNutrients } from '../nutrients.js';
 import { dayTitle } from './today.js';
 
 const GROUPS = [['Macros & more', MACROS], ['Vitamins', VITAMINS], ['Minerals', MINERALS]];
@@ -10,7 +10,7 @@ export function NutrientsView({ dateKey, openSheet, go }) {
   const s = useStore();
   const [range, setRange] = useState('day');
   const t = getTargets(dateKey);
-  const week = weekAverage(dateKey);
+  const week = weekAverage(dateKey, { withKey: true });
   const totals = range === 'day' ? totalsFor(dateKey) : week.totals;
   const met = MICROS.filter((n) => (totals[n.key] || 0) >= t[n.key]).length;
   const low = MICROS.filter((n) => (totals[n.key] || 0) < t[n.key] * 0.5).length;
@@ -18,7 +18,7 @@ export function NutrientsView({ dateKey, openSheet, go }) {
   const when = dateKey === todayKey() ? 'today' : title === 'Yesterday' ? 'yesterday' : `on ${title}`;
   const subtitle = range === 'day'
     ? `Everything you logged ${when}`
-    : week.count ? `Daily average of your last ${week.count} logged day${week.count > 1 ? 's' : ''}` : 'No earlier days logged yet, so this shows today';
+    : week.count > 1 ? `Daily average of your last ${week.count} logged days${week.withKey ? `, including ${when}` : ''}` : `No earlier days logged yet, so this shows ${when}`;
 
   return html`
     <header class="page-head">
@@ -102,7 +102,7 @@ function contributors(nkey, keys, supplements) {
     }
     for (const id of day.supps || []) {
       const sp = supplements.find((x) => x.id === id);
-      const v = sp?.n?.[nkey] || 0;
+      const v = sp ? suppNutrients(sp)[nkey] || 0 : 0;
       if (v > 0) { by.set(sp.name, (by.get(sp.name) || 0) + v); sum += v; }
     }
   }

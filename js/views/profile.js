@@ -77,10 +77,11 @@ export function ProfileView({ openSheet, go }) {
   const streak = loggedStreak(today);
 
   // ---- Vitamins ----
-  const microTotals = week.count ? week.totals : totalsFor(today);
+  const microWeek = weekAverage(today, { withKey: true });
+  const microTotals = microWeek.totals;
   const met = MICROS.filter((n) => (microTotals[n.key] || 0) >= t[n.key]).length;
   const lowest = MICROS.map((n) => ({ n, pct: (microTotals[n.key] || 0) / t[n.key] })).sort((a, b) => a.pct - b.pct).slice(0, 3);
-  const anyFood = week.count > 0 || getDay(today).entries.length > 0;
+  const anyFood = microWeek.count > 0;
 
   return html`
     <header class="page-head">
@@ -157,7 +158,7 @@ export function ProfileView({ openSheet, go }) {
         <button type="button" class="link" onClick=${() => go('nutrients')}>Details</button>
       </div>
       ${anyFood ? html`
-        <p class="micro-score"><b>${met} of ${MICROS.length}</b> daily targets met ${week.count ? 'on average this week' : 'so far today'}</p>
+        <p class="micro-score"><b>${met} of ${MICROS.length}</b> daily targets met ${microWeek.count > 1 ? 'on average this week' : 'so far today'}</p>
         <${Bar} value=${met} max=${MICROS.length} />
         <p class="low-label">Lowest</p>
         <div class="chips">

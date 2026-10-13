@@ -344,8 +344,8 @@ export function coachContext(today = todayKey()) {
     });
   const weights = weighIns().slice(-12).map((w) => `${w.key}: ${lb(w.kg).toFixed(1)} lb / ${w.kg.toFixed(1)} kg`);
   const rate = weeklyRate(weighIns(), today);
-  const week = weekAverage(today);
-  const low = week.count
+  const week = weekAverage(today, { withKey: true });
+  const low = week.count > 1
     ? MICROS.map((n) => ({ n, pct: (week.totals[n.key] || 0) / t[n.key] })).filter((x) => x.pct < 0.7).map((x) => `${x.n.name} ${Math.round(x.pct * 100)}%`)
     : [];
   const eaten = totalsFor(today);
@@ -377,7 +377,7 @@ export function coachContext(today = todayKey()) {
     `Food logged, last 14 days: ${days.length ? '\n' + days.join('\n') : 'nothing yet'}.`,
     `Logged today so far (it is ${now} now): ${todayLines.length ? todayLines.join('; ') : 'nothing yet'}.`,
     `Left for today (targets minus what's logged; use these exact numbers): ${left('kcal')} kcal, ${left('protein')} g protein, ${t.netCarbs ? `${r(t.carbs - netEaten)} g net carbs` : `${left('carbs')} g carbs`}, ${left('fat')} g fat. A negative number means over target.`,
-    `Vitamins and minerals under 70% of target (7-day average): ${low.length ? low.join(', ') : week.count ? 'none' : 'not enough data'}.`,
+    `Vitamins and minerals under 70% of target (7-day average): ${low.length ? low.join(', ') : week.count > 1 ? 'none' : 'not enough data'}.`,
   ].join('\n');
 }
 

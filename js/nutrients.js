@@ -395,7 +395,7 @@ export function dayTotals(day, supplements = []) {
   for (const e of day.entries || []) addInto(t, e.pu, e.amount);
   for (const id of day.supps || []) {
     const s = supplements.find((x) => x.id === id);
-    if (s) addInto(t, s.n);
+    if (s) addInto(t, suppNutrients(s));
   }
   return t;
 }
@@ -497,12 +497,73 @@ export const SUPP_PRESETS = [
   { name: 'Probiotic', extra: [{ name: 'Probiotic cultures', amount: 10, unit: 'billion CFU' }] },
 ];
 
+// Label ingredient names for each tracked nutrient. Vitamins come first so "sodium ascorbate" counts as vitamin C.
+const SUPP_NAMES = [
+  ['vitA', /\b(vitamin a|retinol|retinyl\w*|beta[- ]?carotene)\b/],
+  ['vitC', /\b(vitamin c|ascorbic acid|\w*ascorbate)\b/],
+  ['vitD', /\b(vitamin d[23]?|cholecalciferol|ergocalciferol)\b/],
+  ['vitE', /\b(vitamin e|\w*tocopher\w*)\b/],
+  ['vitK', /\b(vitamin k[12]?|phylloquinone|phytonadione|menaquinone\w*|mk-?[47])\b/],
+  ['b1', /\b(thiamine?|vitamin b-?1)\b/],
+  ['b2', /\b(riboflavin|vitamin b-?2)\b/],
+  ['b3', /\b(niacin(amide)?|nicotinamide|vitamin b-?3)\b/],
+  ['b5', /\b(pantothen\w*|vitamin b-?5)\b/],
+  ['b6', /\b(vitamin b-?6|pyridox\w*)\b/],
+  ['folate', /\b(folate|folic acid|\w*folate|vitamin b-?9)\b/],
+  ['b12', /\b(vitamin b-?12|\w*cobalamin)\b/],
+  ['calcium', /\bcalcium\b/],
+  ['iron', /\b(iron|ferrous|ferric)\b/],
+  ['magnesium', /\bmagnesium\b/],
+  ['potassium', /\bpotassium\b/],
+  ['zinc', /\bzinc\b/],
+  ['selenium', /\b(selenium|selenomethionine)\b/],
+  ['sodium', /\bsodium\b/],
+];
+
+// Matches one label ingredient ("Vitamin D3", 2000, "IU") to a tracked nutrient in Plate's unit, or null.
+export function suppNutrient(name, amount, unit) {
+  const nm = String(name || '').toLowerCase();
+  const hit = SUPP_NAMES.find(([, re]) => re.test(nm));
+  amount = +amount;
+  if (!hit || !(amount > 0)) return null;
+  const key = hit[0];
+  const [base, ...rest] = String(unit || 'mg').toLowerCase().replace('(s)', '').trim().split(/\s+/);
+  const qual = rest.join(' ');
+  let v;
+  if (base === 'iu') {
+    // The same conversions the label scanner uses.
+    if (key === 'vitD') v = amount / 40;
+    else if (key === 'vitA') v = amount * (/carotene/.test(nm) ? 0.05 : 0.3);
+    else if (key === 'vitE') v = amount * (/\bdl-/.test(nm) ? 0.45 : 0.67);
+    else return null;
+    return { key, value: +v.toPrecision(4) };
+  }
+  const mg = { g: 1000, gram: 1000, grams: 1000, mg: 1, mcg: 0.001, 'µg': 0.001, ug: 0.001 }[base];
+  if (!mg) return null;
+  v = amount * mg * (N[key].unit === 'µg' ? 1000 : 1);
+  if (key === 'folate' && /folic/.test(nm) && !/dfe/.test(qual)) v *= 1.7; // folic acid → µg DFE
+  return { key, value: +v.toPrecision(4) };
+}
+
+// A supplement's tracked nutrients. Vitamins typed under "Anything else" count too, unless the field is already filled.
+export function suppNutrients(sp) {
+  const n = { ...(sp?.n || {}) };
+  for (const x of sp?.extra || []) {
+    const m = suppNutrient(x.name, x.amount, x.unit);
+    if (m && !(sp.n?.[m.key] > 0)) n[m.key] = +((n[m.key] || 0) + m.value).toPrecision(4);
+  }
+  return n;
+}
+
+// The "Anything else" ingredients that don't count toward a tracked nutrient.
+export const suppOther = (sp) => (sp?.extra || []).filter((x) => !suppNutrient(x.name, x.amount, x.unit));
+
 // Ingredients without a target (creatine, EPA, biotin…) from the supplements ticked off on a day.
 export function suppExtras(day, supplements = []) {
   const by = new Map();
   for (const id of day?.supps || []) {
     const sp = supplements.find((x) => x.id === id);
-    for (const x of sp?.extra || []) {
+    for (const x of suppOther(sp)) {
       const key = `${x.name.toLowerCase()}|${x.unit}`;
       const cur = by.get(key) || { name: x.name, unit: x.unit, amount: 0, from: [] };
       cur.amount += +x.amount || 0;
