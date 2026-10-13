@@ -800,23 +800,17 @@ svg { flex-shrink: 0; }
 .low-row { border-top: 1px solid var(--line); padding-top: 14px; }
 .low-label { display: block; font-size: 13px; color: var(--ink-2); margin-bottom: 10px; }
 
-.supp-row { display: flex; flex-wrap: wrap; gap: 8px; }
-.supp {
-  display: inline-flex;
-  align-items: center;
-  gap: 9px;
-  height: 42px;
-  padding: 0 15px 0 6px;
-  border-radius: 999px;
-  background: var(--surface-2);
-  font-size: 14.5px;
-  font-weight: 500;
-  transition: transform 0.12s, background-color 0.2s;
-}
-.supp:active { transform: scale(0.96); }
+.card-links { display: flex; gap: 16px; }
+.supp-list { margin-top: 4px; }
+.supp { display: flex; align-items: center; gap: 4px; }
+.supp + .supp { border-top: 1px solid var(--line); }
+.supp-tap { flex: 1; min-width: 0; display: flex; align-items: center; gap: 12px; padding: 10px 0; text-align: left; transition: opacity 0.15s; }
+.supp-tap:active { opacity: 0.6; }
+.supp-name { font-size: 15px; font-weight: 500; line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .supp-icon {
-  width: 30px;
-  height: 30px;
+  flex: none;
+  width: 28px;
+  height: 28px;
   border-radius: 50%;
   display: flex;
   align-items: center;
@@ -824,11 +818,10 @@ svg { flex-shrink: 0; }
   background: var(--surface);
   border: 1.5px solid var(--line);
   color: var(--ink-2);
-  transition: background-color 0.2s, color 0.2s;
+  transition: background-color 0.2s, color 0.2s, border-color 0.2s;
 }
-.supp.on { background: var(--accent-soft); }
-.supp.on .supp-icon { border-color: transparent; }
-.supp.on .supp-icon { background: var(--accent); color: var(--accent-ink); }
+.supp.on .supp-icon { border-color: transparent; background: var(--accent); color: var(--accent-ink); }
+.supp-edit { flex: none; color: var(--ink-3); }
 
 .meals { display: flex; flex-direction: column; gap: 12px; }
 .meal { padding: 14px 16px 14px 18px; }

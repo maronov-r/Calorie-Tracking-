@@ -150,6 +150,10 @@ export function toggleSupp(key, suppId) {
   putDay(key, { ...d, supps: supps.includes(suppId) ? supps.filter((x) => x !== suppId) : [...supps, suppId] });
 }
 
+export function setSupps(key, ids) {
+  putDay(key, { ...getDay(key), supps: ids });
+}
+
 // ---- Profile, settings, targets ----
 
 export function setProfile(profile) {

@@ -8,8 +8,11 @@ import { DEMO, BETA, settleUse } from '../demo.js';
 
 // One line for lists: tracked nutrients first, then anything else on the label.
 export function suppSummary(sp) {
+  const tracked = Object.entries(suppNutrients(sp)).filter(([, v]) => v > 0);
+  // Full names when there are only a couple ("Vitamin D 125 µg"), symbols for a multivitamin.
+  const label = (k) => (tracked.length <= 2 ? N[k].name.replace(/ \(.+\)/, '') : N[k].sym || N[k].name);
   const parts = [
-    ...Object.entries(suppNutrients(sp)).filter(([, v]) => v > 0).map(([k, v]) => `${N[k].sym || N[k].name} ${fmtNum(v)} ${N[k].unit}`),
+    ...tracked.map(([k, v]) => `${label(k)} ${fmtNum(v)} ${N[k].unit}`),
     ...suppOther(sp).filter((x) => x.name && x.amount > 0).map((x) => `${x.name} ${fmtNum(x.amount)} ${x.unit}`),
   ];
   if (!parts.length) return 'Nothing entered yet';

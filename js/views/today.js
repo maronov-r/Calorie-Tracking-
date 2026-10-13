@@ -1,6 +1,6 @@
 import { html, useState, useEffect } from '../vendor/preact.js';
 import {
-  useStore, state, setProfile, getDay, getTargets, totalsFor, weekAverage, MEALS, toggleSupp, setSettings,
+  useStore, state, setProfile, getDay, getTargets, totalsFor, weekAverage, MEALS, toggleSupp, setSupps, setSettings,
   dateKey as todayKey, shiftKey, parseKey, updateEntry, removeEntry, addEntries, toast, latestWeighIn,
 } from '../store.js';
 import { Ring, Bar, Icon, Stepper, Segmented, Sheet, NutritionSummary, statusColor } from '../ui.js';
@@ -12,6 +12,7 @@ import { describeAmount } from '../foods.js';
 import { proteinIdeas } from '../coach.js';
 import { WaterCard } from './water.js';
 import { Celebrate, isSupporter } from './supporter.js';
+import { suppSummary } from './supplements.js';
 import { BuddyPerch } from './mascot.js';
 import { mascotSettings } from '../mascot.js';
 
@@ -220,21 +221,33 @@ function MicroCard({ totals, t, week, hasFood, openNutrient, go }) {
 }
 
 function SuppCard({ supps, taken, dateKey, openSheet }) {
+  const done = supps.filter((sp) => taken.includes(sp.id)).length;
+  const all = done === supps.length;
   return html`
     <section class="card">
       <div class="card-head">
-        <h2 class="card-title">Supplements <span class="card-meta">${taken.filter((id) => supps.some((s) => s.id === id)).length} / ${supps.length}</span></h2>
-        <button type="button" class="link" onClick=${() => openSheet({ type: 'supp', supp: {} })}>Add</button>
+        <h2 class="card-title">Supplements <span class="card-meta">${done} / ${supps.length}</span></h2>
+        <div class="card-links">
+          ${supps.length > 1 && html`<button type="button" class="link" onClick=${() => setSupps(dateKey, all ? [] : supps.map((sp) => sp.id))}>${all ? 'Clear' : 'Took all'}</button>`}
+          <button type="button" class="link" onClick=${() => openSheet({ type: 'supp', supp: {} })}>Add</button>
+        </div>
       </div>
-      <div class="supp-row">
+      <ul class="supp-list">
         ${supps.map((sp) => {
           const on = taken.includes(sp.id);
           return html`
-            <button type="button" class="supp ${on ? 'on' : ''}" aria-pressed=${on} onClick=${() => toggleSupp(dateKey, sp.id)}>
-              <span class="supp-icon">${on && html`<${Icon} name="check" size=${16} stroke=${2.4} />`}</span>${sp.name}
-            </button>`;
+            <li class="supp ${on ? 'on' : ''}">
+              <button type="button" class="supp-tap" aria-pressed=${on} onClick=${() => toggleSupp(dateKey, sp.id)}>
+                <span class="supp-icon">${on && html`<${Icon} name="check" size=${16} stroke=${2.4} />`}</span>
+                <span class="entry-main">
+                  <span class="supp-name">${sp.name}</span>
+                  <span class="entry-sub">${suppSummary(sp)}</span>
+                </span>
+              </button>
+              <button type="button" class="icon-btn sm supp-edit" onClick=${() => openSheet({ type: 'supp', supp: sp })} aria-label=${`Edit ${sp.name}`}><${Icon} name="more" size=${18} /></button>
+            </li>`;
         })}
-      </div>
+      </ul>
     </section>`;
 }
 
