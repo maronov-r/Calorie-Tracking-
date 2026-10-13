@@ -10,14 +10,14 @@ async function get(path) {
   return res.json();
 }
 
-// Products on the market first, then newest. The same product is often listed once per label version.
+// Best matches first, with products no longer sold moved to the end. The same product is often listed once per label version.
 export async function searchSupplements(q) {
   const data = await get(`/search-filter?q=${encodeURIComponent(q)}&size=40`);
   const seen = new Set();
   return (data.hits || [])
     .map((h) => ({ id: h._id, name: h._source.fullName || '', brand: h._source.brandName || '', off: !!h._source.offMarket, date: h._source.entryDate || '' }))
     .filter((x) => x.name)
-    .sort((a, b) => a.off - b.off || b.date.localeCompare(a.date))
+    .sort((a, b) => a.off - b.off)
     .filter((x) => {
       const key = `${x.brand}|${x.name}`.toLowerCase();
       if (seen.has(key)) return false;
