@@ -6,12 +6,20 @@ import {
 import {
   goalFor, styleFor, paceFor, dailyFor, workoutTypeFor, experienceFor, goalPace, normalizeProfile, trainingFor, fatLevel,
   GOALS, STYLES, DIETS, MICROS, KG_PER_LB, KETO_NET_CARBS, fmtKcal, fmtWater, ageBand, scale, addInto,
-  focusFor, directionOf, macroLabel, macroValue, dayMet,
+  focusFor, directionOf, macroLabel, macroValue, dayMet, UPPER, fmtNum, fmtQty, suppSummary,
 } from './nutrients.js';
 import { weeklyRate, dayNum, fmtRate } from './weight.js';
-import { search, foodById, foodByName, fullName } from './foods.js';
+import { search, foodById, foodByName, fullName, describeAmount } from './foods.js';
 
 const lb = (kg) => kg / KG_PER_LB;
+// Grams and ounces next to every logged amount, so the coach never has to convert them itself.
+const amountNote = (e, units) => {
+  const g = e.amount * e.unit.g;
+  const oz = `${+(g / 28.3495).toFixed(1)} oz`;
+  if (e.unit.kind === 'g') return units === 'metric' ? '' : ` (${oz})`;
+  if (e.unit.kind === 'oz') return ` (${Math.round(g)} g)`;
+  return ` (${Math.round(g)} g${units === 'metric' ? '' : `, ${oz}`})`;
+};
 const perWeek = (kg, units) => (units === 'metric' ? `${+kg.toFixed(2)} kg` : `${+lb(kg).toFixed(1)} lb`);
 const paceRange = (p, units) => {
   const range = goalPace(p);
@@ -345,10 +353,16 @@ export function coachContext(today = todayKey()) {
   const weights = weighIns().slice(-12).map((w) => `${w.key}: ${lb(w.kg).toFixed(1)} lb / ${w.kg.toFixed(1)} kg`);
   const rate = weeklyRate(weighIns(), today);
   const week = weekAverage(today, { withKey: true });
-  const low = week.count > 1
-    ? MICROS.map((n) => ({ n, pct: (week.totals[n.key] || 0) / t[n.key] })).filter((x) => x.pct < 0.7).map((x) => `${x.n.name} ${Math.round(x.pct * 100)}%`)
-    : [];
   const eaten = totalsFor(today);
+  // Every vitamin and mineral: amount / target (percent), flagged when above the safe upper limit.
+  const microLine = (tot) => MICROS.map((n) => {
+    const v = tot[n.key] || 0;
+    const over = UPPER[n.key] && v > UPPER[n.key] ? ` OVER UPPER LIMIT of ${fmtNum(UPPER[n.key])}` : '';
+    return `${n.name} ${fmtNum(v)}/${fmtNum(t[n.key])} ${n.unit} (${Math.round((v / t[n.key]) * 100)}%)${over}`;
+  }).join('; ');
+  const day = getDay(today);
+  const supps = state.supplements.map((sp) => `${sp.name}: ${suppSummary(sp)}. Taken today: ${(day.supps || []).includes(sp.id) ? 'yes' : 'no'}.`);
+  const entries = day.entries.map((e) => `[${e.id}] ${mealLabel(e.meal)}: ${e.name}, ${describeAmount(e.amount, e.unit, fmtQty)}${amountNote(e, units)}, ${r((e.pu.kcal || 0) * e.amount)} kcal, ${r((e.pu.protein || 0) * e.amount)} g protein`);
   const left = (k) => r(t[k] - (eaten[k] || 0));
   const netEaten = Math.max(0, (eaten.carbs || 0) - (eaten.fiber || 0));
   const byMeal = {};
@@ -377,7 +391,11 @@ export function coachContext(today = todayKey()) {
     `Food logged, last 14 days: ${days.length ? '\n' + days.join('\n') : 'nothing yet'}.`,
     `Logged today so far (it is ${now} now): ${todayLines.length ? todayLines.join('; ') : 'nothing yet'}.`,
     `Left for today (targets minus what's logged; use these exact numbers): ${left('kcal')} kcal, ${left('protein')} g protein, ${t.netCarbs ? `${r(t.carbs - netEaten)} g net carbs` : `${left('carbs')} g carbs`}, ${left('fat')} g fat. A negative number means over target.`,
-    `Vitamins and minerals under 70% of target (7-day average): ${low.length ? low.join(', ') : week.count > 1 ? 'none' : 'not enough data'}.`,
+    `Today's log entries (ids are for log-fix actions; amounts in the unit the person logged): ${entries.length ? '\n' + entries.join('\n') : 'none yet'}`,
+    `Water today: ${r(day.water)} of ${r(t.water)} ml.`,
+    `Supplements they take (amounts per daily dose; ticked ones already count in today's vitamins): ${supps.length ? '\n' + supps.join('\n') : 'none saved'}`,
+    `Vitamins and minerals today so far, food plus supplements taken: ${microLine(eaten)}.`,
+    week.count > 1 ? `Vitamins and minerals, daily average of the last ${week.count} logged days: ${microLine(week.totals)}.` : 'Vitamins and minerals, 7-day average: not enough days logged yet.',
   ].join('\n');
 }
 

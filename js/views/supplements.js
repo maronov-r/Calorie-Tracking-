@@ -1,23 +1,12 @@
 import { html, useState, useRef, useEffect } from '../vendor/preact.js';
 import { useStore, saveSupplement, deleteSupplement, logAiCost } from '../store.js';
 import { Icon, Sheet, NumberInput } from '../ui.js';
-import { N, SUPP_FIELDS, SUPP_PRESETS, fmtNum, suppNutrient, suppNutrients, suppOther } from '../nutrients.js';
+import { N, SUPP_FIELDS, SUPP_PRESETS, suppNutrient, suppNutrients, suppOther } from '../nutrients.js';
 import { searchSupplements, loadSupplement } from '../dsld.js';
 import { readSupplementLabel, prepareImage, aiErrorMessage } from '../ai.js';
 import { DEMO, BETA, settleUse } from '../demo.js';
 
-// One line for lists: tracked nutrients first, then anything else on the label.
-export function suppSummary(sp) {
-  const tracked = Object.entries(suppNutrients(sp)).filter(([, v]) => v > 0);
-  // Full names when there are only a couple ("Vitamin D 125 µg"), symbols for a multivitamin.
-  const label = (k) => (tracked.length <= 2 ? N[k].name.replace(/ \(.+\)/, '') : N[k].sym || N[k].name);
-  const parts = [
-    ...tracked.map(([k, v]) => `${label(k)} ${fmtNum(v)} ${N[k].unit}`),
-    ...suppOther(sp).filter((x) => x.name && x.amount > 0).map((x) => `${x.name} ${fmtNum(x.amount)} ${x.unit}`),
-  ];
-  if (!parts.length) return 'Nothing entered yet';
-  return parts.length > 4 ? `${parts.slice(0, 4).join(' · ')} +${parts.length - 4} more` : parts.join(' · ');
-}
+export { suppSummary } from '../nutrients.js';
 
 export function SupplementSheet({ supp, onClose, toSettings }) {
   return html`<${Sheet} onClose=${onClose} className="sheet-tall" label="Supplement"

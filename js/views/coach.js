@@ -1,10 +1,10 @@
 import { html, useState, useRef, useEffect } from '../vendor/preact.js';
 import {
   useStore, state, getTargets, logAiCost, updatePlan, setStyle, setSettings, setProfile, setCoach, toast, totalsFor, addEntries, mealForNow, mealLabel,
-  dateKey as todayKey,
+  getDay, updateEntry, removeEntry, MEALS, dateKey as todayKey,
 } from '../store.js';
 import { Icon, Sheet, Segmented, Empty } from '../ui.js';
-import { GOALS, PACES, STYLES, FOCUS, computeTargets, goalFor, styleFor, fmtKcal, fmtNum, focusFor, directionOf, macroLabel } from '../nutrients.js';
+import { GOALS, PACES, STYLES, FOCUS, computeTargets, goalFor, styleFor, fmtKcal, fmtNum, fmtWater, focusFor, directionOf, macroLabel } from '../nutrients.js';
 import { goalGuide, styleGuide, planSteps, coachContext, lookUpFoods, resolveMeal, COACH_GOALS, COACH_STYLES } from '../coach.js';
 import { loadFoods, foodsReady, makeEntry, fullName } from '../foods.js';
 import { askCoach, aiErrorMessage, fmtAiCents } from '../ai.js';
@@ -145,6 +145,46 @@ function applyAction(a) {
     updatePlan({ adjust, adjustOn: todayKey() });
     return true;
   }
+  const ov = state.settings.overrides || {};
+  if (a.type === 'set_water') {
+    const ml = Math.round(parseFloat(a.value) / 50) * 50;
+    if (!(ml >= 1500 && ml <= 5000)) return false;
+    setSettings({ overrides: { ...ov, water: ml } });
+    toast(`Water target: ${fmtWater(ml, state.settings.units)}`, { label: 'Undo', run: () => setSettings({ overrides: { ...ov } }) });
+    return true;
+  }
+  if (a.type === 'set_protein') {
+    const g = Math.round(parseFloat(a.value));
+    const perKg = g / p.weightKg;
+    if (!(perKg >= 0.8 && perKg <= 3)) return false;
+    setSettings({ overrides: { ...ov, protein: g } });
+    toast(`Protein target: ${g} g`, { label: 'Undo', run: () => setSettings({ overrides: { ...ov } }) });
+    return true;
+  }
+  // Fixes to today's log. The id must still be in today's log.
+  const key = todayKey();
+  const e = getDay(key).entries.find((x) => x.id === a.entry);
+  if (!e) return false;
+  if (a.type === 'set_amount') {
+    const grams = parseFloat(a.value);
+    if (!(grams > 0 && grams <= 3000)) return false;
+    const before = e.amount;
+    const amount = e.unit.kind === 'g' ? Math.round(grams) : +(grams / e.unit.g).toFixed(2);
+    updateEntry(key, e.id, { amount });
+    toast(`Updated ${e.name}`, { label: 'Undo', run: () => updateEntry(key, e.id, { amount: before }) });
+    return true;
+  }
+  if (a.type === 'remove_entry') {
+    const removed = removeEntry(key, e.id);
+    toast(`Removed ${e.name}`, { label: 'Undo', run: () => addEntries(key, [removed]) });
+    return true;
+  }
+  if (a.type === 'move_entry' && MEALS.some((m) => m.value === a.value)) {
+    const before = e.meal;
+    updateEntry(key, e.id, { meal: a.value });
+    toast(`Moved ${e.name} to ${mealLabel(a.value)}`, { label: 'Undo', run: () => updateEntry(key, e.id, { meal: before }) });
+    return true;
+  }
   return false;
 }
 
@@ -194,12 +234,16 @@ function MealsTotal({ msg }) {
 }
 
 // What the coach suggested earlier, so follow-up questions can refer to it.
+// Notes the coach needs about its earlier answers: the meals it suggested and the buttons the person tapped.
+// Without the second, a log fix that already happened looks like the coach got the numbers wrong.
 const withMeals = (m) => {
-  if (m.role !== 'assistant' || !m.meals?.length) return m;
-  const lines = m.meals.map((meal) => `${meal.title}: ${meal.items.map((it) => `${it.label} (food ${it.food_id}, ${it.grams} g)`).join(', ')}`);
-  return { ...m, text: `${m.text}
-
-[Meals I suggested: ${lines.join('; ')}]` };
+  if (m.role !== 'assistant') return m;
+  const notes = [];
+  if (m.meals?.length) notes.push(`[Meals I suggested: ${m.meals.map((meal) => `${meal.title}: ${meal.items.map((it) => `${it.label} (food ${it.food_id}, ${it.grams} g)`).join(', ')}`).join('; ')}]`);
+  const tapped = (m.applied || []).map((i) => m.actions?.[i]?.label).filter(Boolean);
+  if (tapped.length) notes.push(`[The person tapped: ${tapped.join('; ')}. Those changes are done and already reflected in their data.]`);
+  if (m.logged?.length) notes.push(`[The person logged ${m.logged.length === 1 ? 'one of these meals' : `${m.logged.length} of these meals`}; it's in today's log.]`);
+  return notes.length ? { ...m, text: `${m.text}\n\n${notes.join('\n')}` } : m;
 };
 
 function Coach({ close, toSettings }) {
@@ -288,7 +332,8 @@ function Coach({ close, toSettings }) {
         <p class="fine center">Your plan's explanation, eating styles and calorie check-ins are free and work without a key.</p>
       ` : msgs.length === 0 ? html`
         <div class="chat-intro">
-          <p class="lead">I can see your goal, targets, food log and weight trend. Ask me anything, or tap a question to start.</p>
+          <p class="lead">I can see your goal, targets, food log, supplements, water and weight trend. Ask me anything, or tap a question to start.</p>
+          <p class="fine">The coach gives estimates and can make mistakes. It isn't medical advice: check with a doctor or pharmacist before starting or changing supplements or medication.</p>
           <div class="starters">
             ${STARTERS.map((q) => html`<button type="button" class="chip" onClick=${() => send(q)}>${q}</button>`)}
           </div>
