@@ -323,18 +323,22 @@ export function deleteCustomFood(id) {
 
 export const totalsFor = (key) => dayTotals(getDay(key), state.supplements);
 
+// A day counts as logged once it has food or a ticked-off supplement.
+export const isLogged = (key) => getDay(key).entries.length > 0 || (getDay(key).supps || []).length > 0;
+
 // Average over the last 7 logged days before `key`. Falls back to `key` itself when nothing earlier is logged.
-export function weekAverage(key) {
+// withKey: also count `key` once it's logged, so today's food and supplements show up right away.
+export function weekAverage(key, { withKey = false } = {}) {
   const days = [];
-  for (let i = 1; i <= 7; i++) {
+  for (let i = withKey ? 0 : 1; i <= 7; i++) {
     const k = shiftKey(key, -i);
-    if (getDay(k).entries.length) days.push(k);
+    if (withKey ? isLogged(k) : getDay(k).entries.length) days.push(k);
   }
-  if (!days.length) return { totals: totalsFor(key), count: 0, keys: [key] };
+  if (!days.length) return { totals: totalsFor(key), count: 0, keys: [key], withKey: false };
   const sum = {};
   for (const k of days) addInto(sum, totalsFor(k));
   for (const k in sum) sum[k] /= days.length;
-  return { totals: sum, count: days.length, keys: days };
+  return { totals: sum, count: days.length, keys: days, withKey: days[0] === key };
 }
 
 // ---- Toast ----

@@ -39,7 +39,7 @@ export function Today({ dateKey, setDateKey, openSheet, go }) {
   const t = getTargets(dateKey);
   const day = getDay(dateKey);
   const totals = totalsFor(dateKey);
-  const week = weekAverage(dateKey);
+  const week = weekAverage(dateKey, { withKey: true });
   const today = todayKey();
   const latest = latestWeighIn();
 
@@ -83,7 +83,7 @@ export function Today({ dateKey, setDateKey, openSheet, go }) {
       <${CalorieCard} totals=${totals} t=${t} profile=${s.profile} isToday=${dateKey === today} openSheet=${openSheet} />
     </div>
     <${WaterCard} dateKey=${dateKey} ml=${day.water || 0} goal=${t.water} units=${s.settings.units} openSheet=${openSheet} />
-    <${MicroCard} totals=${totals} t=${t} week=${week} hasFood=${day.entries.length > 0}
+    <${MicroCard} totals=${totals} t=${t} week=${week} hasFood=${day.entries.length > 0 || (day.supps || []).length > 0}
       openNutrient=${(key) => openSheet({ type: 'nutrient', key })} go=${go} />
     ${s.supplements.length > 0 && html`<${SuppCard} supps=${s.supplements} taken=${day.supps || []} dateKey=${dateKey} openSheet=${openSheet} />`}
     <${Meals} day=${day} openSheet=${openSheet} />
@@ -194,8 +194,9 @@ function MicroCard({ totals, t, week, hasFood, openNutrient, go }) {
         <${Ring} value=${v} max=${t[n.key]} size=${44} stroke=${4} color=${statusColor(st)}><span class="micro-sym">${n.sym}</span><//>
       </button>`;
   };
-  const base = week.count ? week.totals : totals;
-  const low = (week.count || hasFood)
+  const multi = week.count > 1; // more than just today
+  const base = multi ? week.totals : totals;
+  const low = (multi || hasFood)
     ? MICROS.map((n) => ({ n, pct: (base[n.key] || 0) / t[n.key] })).filter((x) => x.pct < 0.7).sort((a, b) => a.pct - b.pct).slice(0, 3)
     : [];
   return html`
@@ -210,7 +211,7 @@ function MicroCard({ totals, t, week, hasFood, openNutrient, go }) {
       <div class="micro-grid">${MINERALS.map(cell)}</div>
       ${low.length > 0 && html`
         <div class="low-row">
-          <span class="low-label">${week.count ? 'Running low this week' : 'Lowest so far today'}</span>
+          <span class="low-label">${multi ? 'Running low this week' : 'Lowest so far today'}</span>
           <div class="chips">
             ${low.map((x) => html`<button type="button" class="chip" onClick=${() => openNutrient(x.n.key)}>${shortName(x.n)} <b style=${{ color: statusColor(x.pct < 0.5 ? 'low' : 'mid') }}>${Math.round(x.pct * 100)}%</b></button>`)}
           </div>

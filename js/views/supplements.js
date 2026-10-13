@@ -1,15 +1,16 @@
-import { html, useState, useRef } from '../vendor/preact.js';
+import { html, useState, useRef, useEffect } from '../vendor/preact.js';
 import { useStore, saveSupplement, deleteSupplement, logAiCost } from '../store.js';
 import { Icon, Sheet, NumberInput } from '../ui.js';
-import { N, SUPP_FIELDS, SUPP_PRESETS, fmtNum } from '../nutrients.js';
+import { N, SUPP_FIELDS, SUPP_PRESETS, fmtNum, suppNutrient, suppNutrients, suppOther } from '../nutrients.js';
+import { searchSupplements, loadSupplement } from '../dsld.js';
 import { readSupplementLabel, prepareImage, aiErrorMessage } from '../ai.js';
 import { DEMO, BETA, settleUse } from '../demo.js';
 
 // One line for lists: tracked nutrients first, then anything else on the label.
 export function suppSummary(sp) {
   const parts = [
-    ...Object.entries(sp.n || {}).filter(([, v]) => v > 0).map(([k, v]) => `${N[k].sym || N[k].name} ${fmtNum(v)} ${N[k].unit}`),
-    ...(sp.extra || []).filter((x) => x.name && x.amount > 0).map((x) => `${x.name} ${fmtNum(x.amount)} ${x.unit}`),
+    ...Object.entries(suppNutrients(sp)).filter(([, v]) => v > 0).map(([k, v]) => `${N[k].sym || N[k].name} ${fmtNum(v)} ${N[k].unit}`),
+    ...suppOther(sp).filter((x) => x.name && x.amount > 0).map((x) => `${x.name} ${fmtNum(x.amount)} ${x.unit}`),
   ];
   if (!parts.length) return 'Nothing entered yet';
   return parts.length > 4 ? `${parts.slice(0, 4).join(' · ')} +${parts.length - 4} more` : parts.join(' · ');
@@ -25,24 +26,33 @@ const UNITS = ['mg', 'µg', 'g', 'IU', 'billion CFU'];
 function SupplementForm({ supp, close, toSettings }) {
   const s = useStore();
   const [name, setName] = useState(supp.name || '');
-  const [n, setN] = useState(supp.n || {});
-  const [extra, setExtra] = useState(supp.extra?.length ? supp.extra : []);
+  // Vitamins typed under "Anything else" move into their tracked field, where they count.
+  const [n, setN] = useState(() => suppNutrients(supp));
+  const [extra, setExtra] = useState(() => suppOther(supp));
+  const [found, setFound] = useState(null);
   const [showAll, setShowAll] = useState(false);
   const [scan, setScan] = useState({ busy: false, error: '', note: '', photo: null });
   const fileRef = useRef();
   const isNew = !supp.id;
   const hasKey = !!s.settings.apiKey;
 
-  const usePreset = (pr) => { setName(pr.name); setN(pr.n || {}); setExtra(pr.extra || []); };
+  const usePreset = (pr) => { setName(pr.name); setN(pr.n || {}); setExtra(pr.extra || []); setFound(null); };
+  const useFound = (sp) => { setName(sp.name); setN(sp.n); setExtra(sp.extra); setShowAll(false); setFound(sp); };
   const setRow = (i, patch) => setExtra((cur) => cur.map((x, j) => (j === i ? { ...x, ...patch } : x)));
-  const cleanExtra = extra.filter((x) => x.name.trim() && x.amount > 0).map((x) => ({ name: x.name.trim(), amount: +x.amount, unit: x.unit || 'mg' }));
-  const valid = name.trim() && (Object.values(n).some((v) => v > 0) || cleanExtra.length > 0);
+  const allExtra = extra.filter((x) => x.name.trim() && x.amount > 0).map((x) => ({ name: x.name.trim(), amount: +x.amount, unit: x.unit || 'mg' }));
+  const cleanExtra = allExtra.filter((x) => !suppNutrient(x.name, x.amount, x.unit));
+  const valid = name.trim() && (Object.values(n).some((v) => v > 0) || allExtra.length > 0);
   // Fields with an amount always show; the rest stay folded away until asked for.
   const shown = showAll ? SUPP_FIELDS : SUPP_FIELDS.filter((f) => n[f.key] > 0);
 
   const save = () => {
     const clean = {};
     for (const [k, v] of Object.entries(n)) if (v > 0) clean[k] = v;
+    // A vitamin added as an ingredient ("Vitamin C 500 mg") still counts, in its tracked field.
+    for (const x of allExtra) {
+      const m = suppNutrient(x.name, x.amount, x.unit);
+      if (m && !clean[m.key]) clean[m.key] = m.value;
+    }
     saveSupplement({ ...supp, name: name.trim(), n: clean, extra: cleanExtra });
     close();
   };
@@ -58,6 +68,7 @@ function SupplementForm({ supp, close, toSettings }) {
       const res = await readSupplementLabel({ apiKey: s.settings.apiKey, model: s.settings.model, imageB64: img.b64 });
       logAiCost('label', res.cost);
       if (BETA) settleUse('Label scan');
+      setFound(null);
       if (res.name) setName(res.name);
       setN(res.n);
       setExtra(res.extra);
@@ -75,6 +86,9 @@ function SupplementForm({ supp, close, toSettings }) {
       <button type="button" class="icon-btn" onClick=${close} aria-label="Close"><${Icon} name="close" /></button>
     </div>
     <div class="sheet-body form">
+      <${SuppSearch} onPick=${useFound} />
+      ${found && html`<p class="ai-note"><${Icon} name="check" size=${17} /><span>Filled in from the NIH label database${found.serving ? `, for one serving (${found.serving})` : ''}. Check it matches your bottle, then save.</span></p>`}
+
       <div class="scan-label">
         <input ref=${fileRef} type="file" accept="image/*" capture="environment" hidden onChange=${onPhoto} />
         ${DEMO
@@ -124,5 +138,66 @@ function SupplementForm({ supp, close, toSettings }) {
     <div class="sheet-foot ${isNew ? '' : 'two'}">
       ${!isNew && html`<button type="button" class="btn btn-quiet danger" onClick=${() => { deleteSupplement(supp.id); close(); }}><${Icon} name="trash" size=${18} /> Delete</button>`}
       <button type="button" class="btn btn-primary ${isNew ? 'btn-block' : ''}" disabled=${!valid || scan.busy} onClick=${save}>Save</button>
+    </div>`;
+}
+
+// Search U.S. supplement labels by name and brand, and fill the form from the one picked.
+function SuppSearch({ onPick }) {
+  const [q, setQ] = useState('');
+  const [res, setRes] = useState({ busy: false, items: null, error: '', loading: null });
+  const term = q.trim();
+
+  useEffect(() => {
+    if (term.length < 3) { setRes((r) => ({ ...r, busy: false, items: null, error: '' })); return; }
+    let stale = false;
+    setRes((r) => ({ ...r, busy: true, error: '' }));
+    const timer = setTimeout(async () => {
+      try {
+        const items = await searchSupplements(term);
+        if (!stale) setRes((r) => ({ ...r, busy: false, items }));
+      } catch {
+        if (!stale) setRes((r) => ({ ...r, busy: false, items: null, error: "Couldn't search right now. Check your connection, or enter it below." }));
+      }
+    }, 350);
+    return () => { stale = true; clearTimeout(timer); };
+  }, [term]);
+
+  const pick = async (item) => {
+    setRes((r) => ({ ...r, loading: item.id, error: '' }));
+    try {
+      const sp = await loadSupplement(item.id);
+      if (!Object.keys(sp.n).length && !sp.extra.length) throw new Error('empty');
+      onPick(sp);
+      setQ('');
+      setRes({ busy: false, items: null, error: '', loading: null });
+    } catch {
+      setRes((r) => ({ ...r, loading: null, error: "Couldn't load that label. Try another one, or enter it below." }));
+    }
+  };
+
+  return html`
+    <div class="supp-search">
+      <div class="search-bar">
+        <${Icon} name="search" size=${19} />
+        <input type="search" placeholder="Search by name or brand, e.g. Centrum Men" value=${q}
+          onInput=${(e) => setQ(e.currentTarget.value)} enterkeyhint="search" autocomplete="off" autocorrect="off" spellcheck=${false} />
+        ${q && html`<button type="button" class="icon-btn sm" onClick=${() => setQ('')} aria-label="Clear"><${Icon} name="close" size=${16} /></button>`}
+      </div>
+      ${res.busy && html`<p class="loading-line"><span class="spinner" /> Searching…</p>`}
+      ${res.error && html`<p class="error">${res.error}</p>`}
+      ${!res.busy && res.items && res.items.length === 0 && html`<p class="fine">No labels found. Try just the brand, or enter it below.</p>`}
+      ${!res.busy && res.items?.length > 0 && html`
+        <ul class="food-list">
+          ${res.items.map((x) => html`
+            <li>
+              <button type="button" class="food-row" disabled=${!!res.loading} onClick=${() => pick(x)}>
+                <span class="entry-main">
+                  <span class="entry-name">${x.name}</span>
+                  <span class="entry-sub">${[x.brand, x.off && 'no longer sold'].filter(Boolean).join(' · ')}</span>
+                </span>
+                ${res.loading === x.id && html`<span class="spinner" />`}
+              </button>
+            </li>`)}
+        </ul>`}
     </div>`;
 }
