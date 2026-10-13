@@ -1,6 +1,6 @@
 // Offline support. App code comes from the network when it can (so updates show up right away)
 // and from the cache when offline. Big, rarely changing files are served from the cache first.
-const CACHE = 'plate-v23';
+const CACHE = 'plate-v24';
 const SHELL = [
   './',
   './index.html',
@@ -27,6 +27,7 @@ const SHELL = [
   './js/views/coach.js',
   './js/views/water.js',
   './js/views/supplements.js',
+  './js/views/terms.js',
   './js/dsld.js',
   './js/views/builder.js',
   './js/views/credit.js',

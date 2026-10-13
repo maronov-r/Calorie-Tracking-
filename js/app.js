@@ -12,6 +12,7 @@ import { WaterSheet } from './views/water.js';
 import { SupplementSheet } from './views/supplements.js';
 import { BuilderSheet } from './views/builder.js';
 import { Onboarding } from './views/onboarding.js';
+import { TermsGate, termsAccepted } from './views/terms.js';
 import { DEMO, BETA, ensureAccount } from './demo.js';
 import { TopUpSheet } from './views/credit.js';
 
@@ -51,6 +52,7 @@ function App() {
 
   if (!s.ready) return html`<div class="boot" />`;
   if (!s.profile) return html`<${Onboarding} />`;
+  if (!termsAccepted(s.settings)) return html`<${TermsGate} />`;
 
   const go = (next, toSection = null) => {
     setTab(next);

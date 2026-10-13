@@ -135,6 +135,8 @@ function Rich({ text }) {
 
 function applyAction(a) {
   const p = state.profile;
+  // Under 18: no fat-loss goals, faster pace or calorie cuts from the coach, whatever it suggests.
+  if (p.age < 18 && ((a.type === 'set_goal' && a.value === 'cut') || (a.type === 'set_pace' && a.value === 'faster') || (a.type === 'adjust_calories' && parseFloat(a.value) < 0))) return false;
   if (a.type === 'set_goal' && COACH_GOALS.includes(a.value)) { updatePlan({ goal: a.value }); return true; }
   if (a.type === 'set_pace' && PACES.some((x) => x.value === a.value)) { updatePlan({ pace: a.value }); return true; }
   if (a.type === 'set_style' && COACH_STYLES.includes(a.value)) { setStyle(a.value); return true; }

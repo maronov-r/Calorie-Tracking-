@@ -4,6 +4,8 @@ import { Ring } from '../ui.js';
 import { PlanBuilder } from './builder.js';
 import { recommendGoal } from '../nutrients.js';
 import { PAID } from '../demo.js';
+import { TermsAgree, termsAccepted } from './terms.js';
+import { useStore } from '../store.js';
 
 // 5′10″, 200 lb, new to lifting, planning weights 3× a week, high protein and low carb.
 const SAMPLE = {
@@ -12,6 +14,7 @@ const SAMPLE = {
 };
 
 export function Onboarding() {
+  const s = useStore();
   const [started, setStarted] = useState(false);
   const [units, setUnits] = useState('us');
 
@@ -30,8 +33,10 @@ export function Onboarding() {
           <h1 class="ob-title">Plate</h1>
           <p class="ob-lead">Calories, water and vitamins, tracked simply, with a plan built around you. Everything stays on your phone, and there's no subscription.</p>
         </div>
-        <button type="button" class="btn btn-primary btn-block btn-lg" onClick=${() => setStarted(true)}>Get started</button>
-        ${PAID && html`<button type="button" class="btn btn-quiet btn-block" onClick=${() => finish({ ...SAMPLE, goal: recommendGoal(SAMPLE).goal }, 'low_carb')}>Skip: use a sample person</button>`}
+        ${termsAccepted(s.settings)
+          ? html`<button type="button" class="btn btn-primary btn-block btn-lg" onClick=${() => setStarted(true)}>Get started</button>`
+          : html`<${TermsAgree} label="Get started" onDone=${() => setStarted(true)} />`}
+        ${PAID && termsAccepted(s.settings) && html`<button type="button" class="btn btn-quiet btn-block" onClick=${() => finish({ ...SAMPLE, goal: recommendGoal(SAMPLE).goal }, 'low_carb')}>Skip: use a sample person</button>`}
       </div>`;
   }
 

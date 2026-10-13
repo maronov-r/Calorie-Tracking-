@@ -6,6 +6,7 @@ import {
 import { Icon, Segmented, NumberInput } from '../ui.js';
 import { dailyFor, workoutTypeFor, experienceFor, normalizeProfile, ML_PER_OZ, fmtNum, fmtKcal, computeTargets, goalFor, styleFor, KG_PER_LB } from '../nutrients.js';
 import { suppSummary } from './supplements.js';
+import { TERMS_URL, PRIVACY_URL } from './terms.js';
 import { AI_MODELS } from '../ai.js';
 import { DEMO, PAID } from '../demo.js';
 import { CreditCard } from './credit.js';
@@ -232,7 +233,8 @@ export function SettingsView({ go, section, openSheet }) {
 
     <p class="fine center colophon">
       Plate · Food data from USDA FoodData Central and Open Food Facts (ODbL).<br />
-      Targets follow the U.S. Dietary Reference Intakes. This isn’t medical advice.
+      Targets follow the U.S. Dietary Reference Intakes. This isn’t medical advice.<br />
+      <a href=${TERMS_URL} target="_blank" rel="noopener">Terms of Use</a> · <a href=${PRIVACY_URL} target="_blank" rel="noopener">Privacy Policy</a>
     </p>
 
   `;
